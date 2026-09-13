@@ -329,6 +329,14 @@
                     <div style="font-size: 0.75rem; color: var(--gray-500); margin-top: 0.375rem;">
                         {% trans "Select which grade levels to extract. The document will be analyzed once and separate courses created per level." %}
                     </div>
+                    {% comment %}
+                    Live preview of what subject + grade will inherit. The
+                    consequence of these two dropdowns used to be invisible
+                    until the course existed and somebody noticed the badge
+                    was missing.
+                    {% endcomment %}
+                    <div id="inheritance-preview" hidden
+                         style="margin-top:0.625rem;font-size:0.8125rem;border-radius:6px;padding:0.6rem 0.8rem;line-height:1.45;"></div>
                 </div>
 
                 <!-- Page range — scope a single grade out of a multi-grade PDF -->
@@ -521,6 +529,64 @@
         last.addEventListener('input', refresh);
         document.querySelectorAll('input[name="grade_level"]').forEach(cb =>
             cb.addEventListener('change', refresh));
+        refresh();
+    })();
+
+    // Live "what will this inherit" preview — subject + grade decide whether a
+    // new course picks up the shared library, and that was previously only
+    // discoverable after the fact.
+    (function () {
+        const box = document.getElementById('inheritance-preview');
+        const subject = document.getElementById('subject_code');
+        if (!box || !subject) return;
+        const url = "{% url 'dashboard:material_inheritance_preview' %}";
+        let seq = 0;
+
+        function render(d) {
+            const ok = d.status === 'matched';
+            box.style.background = ok ? '#ECFDF5' : '#F8FAFC';
+            box.style.border = '1px solid ' + (ok ? '#A7F3D0' : 'var(--gray-200)');
+            box.style.color = ok ? '#065F46' : 'var(--gray-600)';
+            let msg;
+            if (d.status === 'matched') {
+                const n = d.material_count;
+                msg = '<strong>' + n + ' platform-wide material' + (n === 1 ? '' : 's') +
+                      '</strong> will be available to this course automatically' +
+                      (d.from_courses.length ? ' — from ' + d.from_courses.join(', ') : '') + '.';
+            } else if (d.status === 'platform_courses_unclassified') {
+                msg = '<strong>No shared materials will reach this course.</strong> ' +
+                      d.unclassified.length + ' platform-wide course(s) hold materials but have no ' +
+                      'subject set, so nothing can match them: ' + d.unclassified.join(', ') + '.';
+            } else if (d.status === 'grade_mismatch') {
+                msg = '<strong>No shared materials for this grade.</strong> Platform-wide ' +
+                      'courses exist for this subject but cover other grades.';
+            } else if (d.status === 'matched_but_empty') {
+                msg = '<strong>No shared materials yet.</strong> A platform-wide course matches ' +
+                      'this subject and grade but has nothing uploaded to it.';
+            } else {
+                msg = '<strong>No shared materials yet.</strong> There is no platform-wide course ' +
+                      'for this subject, so this course starts with only what you upload to it.';
+            }
+            box.innerHTML = msg;
+            box.hidden = false;
+        }
+
+        function refresh() {
+            if (!subject.value) { box.hidden = true; return; }
+            const params = new URLSearchParams();
+            params.set('subject_code', subject.value);
+            document.querySelectorAll('input[name="grade_level"]:checked')
+                .forEach(cb => params.append('grade_level', cb.value));
+            const mine = ++seq;
+            fetch(url + '?' + params.toString(), {headers: {'Accept': 'application/json'}})
+                .then(r => r.ok ? r.json() : null)
+                .then(d => { if (d && d.ok && mine === seq) render(d); })
+                .catch(() => { /* preview is optional — never block the upload */ });
+        }
+
+        subject.addEventListener('change', refresh);
+        document.querySelectorAll('input[name="grade_level"]')
+            .forEach(cb => cb.addEventListener('change', refresh));
         refresh();
     })();
 

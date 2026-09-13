@@ -1483,7 +1483,8 @@ class CurriculumKnowledgeBase:
                         return clause
         return None
 
-    def _global_upload_ids_matching_course(self, course) -> set:
+    @staticmethod
+    def _global_upload_ids_matching_course(course) -> set:
         """Return the set of TeachingMaterialUpload IDs from platform-wide
         courses whose subject_code matches AND whose grade_levels overlap
         with the supplied course. Empty set when course has no
@@ -1493,7 +1494,9 @@ class CurriculumKnowledgeBase:
             subject_code = getattr(course, 'subject_code', '') or ''
             course_grades = set(getattr(course, 'grade_levels', None) or [])
             if not subject_code:
-                return set()
+                # No rule match is possible, but a hand-attached material
+                # still counts — this is the likeliest course to have one.
+                return CurriculumKnowledgeBase._hand_attached_upload_ids(course)
         except Exception:
             return set()
 
@@ -1516,12 +1519,32 @@ class CurriculumKnowledgeBase:
                 matching_course_ids.append(gc.id)
 
         if not matching_course_ids:
-            return set()
+            return CurriculumKnowledgeBase._hand_attached_upload_ids(course)
 
         upload_ids = set(TeachingMaterialUpload.objects.filter(
             course_id__in=matching_course_ids,
         ).values_list('id', flat=True))
+        upload_ids |= CurriculumKnowledgeBase._hand_attached_upload_ids(course)
         return upload_ids
+
+    @staticmethod
+    def _hand_attached_upload_ids(course) -> set:
+        """Materials a teacher attached to this course directly.
+
+        A union with the subject+grade match, never a replacement: attaching
+        by hand can only ever add. Kept as its own method, and called from
+        both the matched and unmatched paths above, because the early returns
+        in the matching logic would otherwise skip it — a course with no
+        subject_code has no rule match at all, and that is exactly the course
+        somebody is most likely to have attached materials to by hand.
+        """
+        try:
+            return set(course.shared_materials.values_list('id', flat=True))
+        except Exception:                                    # noqa: BLE001
+            # A course object that is not a real model instance (tests, a
+            # deferred .only() row without the m2m). Never break retrieval
+            # over an optional extra.
+            return set()
 
     def _convert_fallback_to_query_results(self, merged: List[Dict]) -> Dict:
         """Convert query_with_global_fallback() output to ChromaDB query() format

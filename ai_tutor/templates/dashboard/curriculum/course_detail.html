@@ -514,6 +514,23 @@ broken one — no badge, no explanation. Every outcome now says which it is.
         <span style="color:var(--gray-500);">— from
             {% for pc in inherited_materials.platform_courses %}<em>{{ pc.title }}</em>{% if not forloop.last %}, {% endif %}{% endfor %}</span>
         {% endif %}
+        {% if inherited_materials.hand_attached %}
+        <br><span style="color:#065F46;">{% blocktrans count n=inherited_materials.hand_attached|length %}plus {{ n }} attached to this course by hand{% plural %}plus {{ n }} attached to this course by hand{% endblocktrans %}</span>
+        <span style="color:var(--gray-500);">—
+            {% for m in inherited_materials.hand_attached %}<em>{{ m.title }}</em>{% if not forloop.last %}, {% endif %}{% endfor %}</span>
+        {% endif %}
+    </div>
+</div>
+{% elif inherited_materials.status == 'hand_attached_only' %}
+<div style="background:#ECFDF5;border:1px solid #A7F3D0;border-radius:8px;padding:0.85rem 1rem;margin-bottom:1rem;display:flex;align-items:center;gap:0.75rem;color:#065F46;">
+    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="flex-shrink:0;">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+    </svg>
+    <div style="font-size:0.875rem;line-height:1.4;">
+        <strong>{% blocktrans count n=inherited_materials.hand_attached|length %}{{ n }} platform-wide material attached to this course by hand{% plural %}{{ n }} platform-wide materials attached to this course by hand{% endblocktrans %}</strong>
+        <span style="color:var(--gray-500);">—
+            {% for m in inherited_materials.hand_attached %}<em>{{ m.title }}</em>{% if not forloop.last %}, {% endif %}{% endfor %}.
+            {% trans "Set a subject and grade to inherit the rest automatically." %}</span>
     </div>
 </div>
 {% else %}
@@ -522,7 +539,11 @@ broken one — no badge, no explanation. Every outcome now says which it is.
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
     </svg>
     <div style="font-size:0.875rem;line-height:1.45;">
+        {% if inherited_materials.hand_attached %}
+        <strong>{% blocktrans count n=inherited_materials.hand_attached|length %}Only the {{ n }} material attached by hand reaches this course.{% plural %}Only the {{ n }} materials attached by hand reach this course.{% endblocktrans %}</strong><br>
+        {% else %}
         <strong>{% trans "No platform-wide materials reach this course yet." %}</strong><br>
+        {% endif %}
         {% if inherited_materials.status == 'platform_courses_unclassified' %}
             {% blocktrans count n=inherited_materials.unclassified_courses|length %}{{ n }} platform-wide course has teaching materials but no subject set, so nothing can match it.{% plural %}{{ n }} platform-wide courses have teaching materials but no subject set, so nothing can match them.{% endblocktrans %}
             <span style="color:var(--gray-500);">—
@@ -542,6 +563,46 @@ broken one — no badge, no explanation. Every outcome now says which it is.
     </div>
 </div>
 {% endif %}
+{% endif %}
+
+{% comment %}
+Attach platform-wide materials by hand. Its own form posting to its own
+endpoint — NOT part of the Edit Course form, which the re-parse button also
+submits with a subset of fields; a checkbox list there would arrive empty on
+every re-parse and silently detach everything.
+{% endcomment %}
+{% if can_edit_content and attachable_materials %}
+<details class="card" style="margin-bottom:1.5rem;">
+    <summary style="cursor:pointer;padding:1rem 1.25rem;font-weight:600;display:flex;align-items:center;gap:0.5rem;">
+        📎 {% trans "Attach platform-wide materials by hand" %}
+        {% if attached_material_ids %}<span style="font-size:0.75rem;font-weight:600;background:#D1FAE5;color:#065F46;padding:0.1rem 0.5rem;border-radius:999px;">{{ attached_material_ids|length }}</span>{% endif %}
+    </summary>
+    <div style="padding:0 1.25rem 1.25rem;">
+        <p style="font-size:0.8125rem;color:var(--gray-500);margin-top:0;">
+            {% trans "These are added on top of whatever this course already inherits automatically by subject and grade — attaching by hand can only add, never remove." %}
+        </p>
+        <form method="post" action="{% url 'dashboard:course_shared_materials' course.id %}">
+            {% csrf_token %}
+            <div style="max-height:22rem;overflow-y:auto;border:1px solid var(--gray-200);border-radius:6px;padding:0.5rem;">
+                {% for m in attachable_materials %}
+                <label style="display:flex;align-items:flex-start;gap:0.5rem;padding:0.4rem 0.5rem;border-radius:4px;cursor:pointer;font-size:0.8125rem;">
+                    <input type="checkbox" name="material_ids" value="{{ m.id }}" style="margin-top:0.2rem;"
+                           {% if m.id in attached_material_ids %}checked{% endif %}>
+                    <span>
+                        <strong>{{ m.title }}</strong>
+                        <span style="color:var(--gray-500);">· {{ m.get_material_type_display }}{% if m.subject_name %} · {{ m.subject_name }}{% endif %}{% if m.grade_level %} · {{ m.grade_level }}{% endif %}</span>
+                        {% if m.course %}<br><span style="color:var(--gray-400);font-size:0.75rem;">{% trans "from" %} {{ m.course.title }}</span>
+                        {% else %}<br><span style="color:var(--warning,#92400E);font-size:0.75rem;">{% trans "not on any platform-wide course — only reachable by attaching it here" %}</span>{% endif %}
+                    </span>
+                </label>
+                {% endfor %}
+            </div>
+            <button type="submit" class="btn btn-secondary btn-sm" style="margin-top:0.75rem;">
+                {% trans "Save attached materials" %}
+            </button>
+        </form>
+    </div>
+</details>
 {% endif %}
 
 <!-- Teaching Materials -->

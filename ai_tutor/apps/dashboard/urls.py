@@ -35,6 +35,8 @@ urlpatterns = [
     
     # Course management
     path('curriculum/course/<int:course_id>/edit/', views.course_edit, name='course_edit'),
+    path('curriculum/course/<int:course_id>/shared-materials/', views.course_shared_materials, name='course_shared_materials'),
+    path('curriculum/material-inheritance-preview/', views.material_inheritance_preview, name='material_inheritance_preview'),
     path('curriculum/course/<int:course_id>/reupload/', views.course_reupload, name='course_reupload'),
     path('curriculum/course/<int:course_id>/units/reorder/', views.course_reorder_units, name='course_reorder_units'),
     path('curriculum/unit/<int:unit_id>/lessons/reorder/', views.unit_reorder_lessons, name='unit_reorder_lessons'),

@@ -183,7 +183,26 @@ def _inherited_materials_summary(course):
     Same matching logic as CurriculumKnowledgeBase._global_upload_ids_matching_course
     so the badge count matches what the engine actually sees.
     """
-    if not course or not getattr(course, 'subject_code', ''):
+    if not course:
+        return None
+    # Hand-attached materials are counted on every path, including the ones
+    # where the subject+grade rule matches nothing — that is the course most
+    # likely to have them.
+    # `course.pk` guard: the upload-form preview passes an UNSAVED Course to
+    # reuse this exact rule, and an m2m read on an unsaved instance raises.
+    # Nothing is hand-attached to a course that does not exist yet.
+    hand_attached = (
+        list(course.shared_materials.select_related('course').all())
+        if getattr(course, 'pk', None) else []
+    )
+    if not getattr(course, 'subject_code', ''):
+        if hand_attached:
+            return {
+                'status': 'hand_attached_only',
+                'platform_courses': [],
+                'material_count': 0,
+                'hand_attached': hand_attached,
+            }
         return None
     course_grades = set(course.grade_levels or [])
 
@@ -205,10 +224,18 @@ def _inherited_materials_summary(course):
         material_count = TeachingMaterialUpload.objects.filter(
             course_id__in=[c.id for c in matching],
         ).count()
+        if material_count or hand_attached:
+            return {
+                'status': 'matched',
+                'platform_courses': matching,
+                'material_count': material_count,
+                'hand_attached': hand_attached,
+            }
         return {
-            'status': 'matched' if material_count else 'matched_but_empty',
+            'status': 'matched_but_empty',
             'platform_courses': matching,
-            'material_count': material_count,
+            'material_count': 0,
+            'hand_attached': [],
         }
 
     # Nothing matched, and the course itself is set up correctly — which until
@@ -233,6 +260,7 @@ def _inherited_materials_summary(course):
             'status': 'platform_courses_unclassified',
             'platform_courses': [],
             'material_count': 0,
+            'hand_attached': hand_attached,
             'unclassified_courses': unclassified_with_materials,
         }
 
@@ -242,6 +270,7 @@ def _inherited_materials_summary(course):
             'status': 'grade_mismatch',
             'platform_courses': [],
             'material_count': 0,
+            'hand_attached': hand_attached,
             'subject_courses': platform_courses,
         }
 
@@ -249,6 +278,7 @@ def _inherited_materials_summary(course):
         'status': 'no_platform_course',
         'platform_courses': [],
         'material_count': 0,
+        'hand_attached': hand_attached,
     }
 
 
@@ -1879,6 +1909,20 @@ def course_detail(request, course_id):
         # so teachers see they're not orphaned when they didn't upload
         # textbooks themselves. Computed only when not platform-wide.
         'inherited_materials': _inherited_materials_summary(course) if not is_platform_wide else None,
+        # Everything attachable by hand, plus what is already attached, for
+        # the picker. Platform-wide only — see course_shared_materials.
+        'attachable_materials': (
+            [] if is_platform_wide else list(
+                TeachingMaterialUpload.objects
+                .filter(institution__isnull=True)
+                .select_related('course')
+                .order_by('subject_name', 'title')[:200]
+            )
+        ),
+        'attached_material_ids': (
+            set() if is_platform_wide
+            else set(course.shared_materials.values_list('id', flat=True))
+        ),
         'is_platform_wide': is_platform_wide,
         'course_read_only': course_read_only,
         'course_tier_label': course_tier_label,
@@ -8035,6 +8079,91 @@ def lesson_move_objective(request, lesson_id):
         f"from \"{source.title}\" to \"{target.title}\".",
     )
     return redirect('dashboard:lesson_detail', lesson_id=source.id)
+
+
+@teacher_required
+def material_inheritance_preview(request):
+    """What a course created with this subject + grade would inherit.
+
+    Read-only JSON for the upload form, so the teacher sees the consequence of
+    the two dropdowns at the moment of choosing rather than discovering it on
+    a course page afterwards. Mirrors the matching in
+    `_inherited_materials_summary` by building a throwaway Course with the
+    posted values — not a copy of the rule, the same rule.
+    """
+    from ai_tutor.apps.curriculum.models import Course as CourseModel
+
+    subject_code = (request.GET.get('subject_code') or '').strip()
+    grades = [g.strip() for g in request.GET.getlist('grade_level') if g.strip()]
+    if not subject_code:
+        return JsonResponse({'ok': True, 'status': 'no_subject', 'material_count': 0})
+
+    probe = CourseModel(
+        title='', institution=None,
+        subject_code=subject_code, grade_level=','.join(grades),
+    )
+    # Unsaved instance: shared_materials would raise, and there is nothing
+    # hand-attached to a course that does not exist yet.
+    summary = _inherited_materials_summary(probe) or {}
+    return JsonResponse({
+        'ok': True,
+        'status': summary.get('status', 'no_platform_course'),
+        'material_count': summary.get('material_count', 0),
+        'from_courses': [c.title for c in summary.get('platform_courses', [])],
+        'unclassified': [c.title for c in summary.get('unclassified_courses', [])],
+    })
+
+
+@teacher_required
+@require_POST
+def course_shared_materials(request, course_id):
+    """Attach / detach platform-wide materials to one course by hand.
+
+    Its own endpoint rather than part of `course_edit`, deliberately. That view
+    is also the target of the re-parse form, which posts a small subset of
+    fields — so a checkbox list living there would arrive EMPTY on every
+    re-parse and silently detach everything. The same absent-field trap that
+    made `defaults` skip subject and grade on an existing course.
+
+    What this writes is a union with the automatic subject+grade match, never
+    a replacement: attaching by hand can only add. Only platform-wide
+    materials are attachable — a school's own material reaching another school
+    would be a cross-tenant leak, so the queryset is filtered rather than
+    trusting the posted ids.
+    """
+    from ai_tutor.apps.dashboard.models import TeachingMaterialUpload
+
+    institution = request.staff_ctx['institution']
+    if institution is not None:
+        course = get_object_or_404(Course, id=course_id, institution=institution)
+    else:
+        course = get_object_or_404(Course, id=course_id)
+
+    posted_ids = {int(i) for i in request.POST.getlist('material_ids') if i.isdigit()}
+    # Platform-wide only, and re-read from the DB rather than trusting the
+    # post: an id for another school's material simply will not be found.
+    allowed = TeachingMaterialUpload.objects.filter(
+        institution__isnull=True, id__in=posted_ids,
+    )
+    course.shared_materials.set(allowed)
+
+    n = allowed.count()
+    dropped = len(posted_ids) - n
+    if dropped:
+        messages.warning(
+            request,
+            f"{dropped} material(s) could not be attached — only platform-wide "
+            f"materials can be shared into a course.",
+        )
+    messages.success(
+        request,
+        f"{n} platform-wide material(s) attached to \"{course.title}\" by hand. "
+        f"They are in addition to anything matched automatically by subject and grade."
+        if n else
+        f"No hand-attached materials on \"{course.title}\". It still inherits "
+        f"whatever matches its subject and grade.",
+    )
+    return redirect('dashboard:course_detail', course_id=course.id)
 
 
 @teacher_required

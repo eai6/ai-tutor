@@ -107,3 +107,23 @@ def test_the_page_renders_the_explanation(client, teacher, course, setup, expect
         reverse('dashboard:course_detail', args=[course.id])).content.decode()
     assert 'No platform-wide materials reach this course yet' in body
     assert expected in body
+
+
+def test_a_course_with_no_subject_but_a_hand_attached_material(client, teacher, school):
+    """Not "nothing reaches this course" — one thing does, and the page says
+    so rather than falling back to the no-subject warning alone."""
+    from ai_tutor.apps.curriculum.models import Course as C
+
+    unclassified = C.objects.create(
+        title='Mystery', institution=school, subject_code='', grade_level='')
+    material = _material(None, title='Hand Book')
+    unclassified.shared_materials.add(material)
+
+    summary = _inherited_materials_summary(unclassified)
+    assert summary['status'] == 'hand_attached_only'
+
+    client.force_login(teacher)
+    body = client.get(
+        reverse('dashboard:course_detail', args=[unclassified.id])).content.decode()
+    assert 'attached to this course by hand' in body
+    assert 'Hand Book' in body
