@@ -1203,10 +1203,23 @@ def student_detail(request, student_id):
     # denominator. Edward, 2026-05-07: show the full course
     # structure so teachers see how far through the course a
     # student is even when later lessons aren't published yet.
-    course_lesson_counts = {}
-    courses_qs = filter_by_institution(
-        Course.objects.all(), institution
+    # Scoped to the STUDENT's school, not the viewer's picker.
+    #
+    # filter_by_institution here read request.staff_ctx — so a super-admin on
+    # "All Schools" saw every course on the platform listed as available to one
+    # student. A student at Mont Fleuri was shown Belonie, Perseverence and
+    # Pointe Larue courses as work waiting for them, at schools they do not
+    # attend. A regular teacher never saw it, because their picker is their own
+    # school; it only appeared from the aggregated view.
+    #
+    # Platform-wide courses (institution=None) stay in: those really are
+    # available to everyone.
+    student_institution = membership.institution
+    courses_qs = Course.objects.filter(
+        Q(institution=student_institution) | Q(institution__isnull=True)
     ).prefetch_related('units__lessons')
+
+    course_lesson_counts = {}
     for course in courses_qs:
         count = 0
         for unit in course.units.all():

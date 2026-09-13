@@ -444,3 +444,63 @@ class TestMasteryIsScopedToACourse:
 
         assert response.context['course_tabs'] == []
         assert 'No course with published lessons' in response.content.decode()
+
+
+@pytest.mark.django_db
+class TestTheCoursesBelongToTheStudentsSchool:
+    """A student at Mont Fleuri was shown Belonie, Perseverence and Pointe
+    Larue courses as work waiting for them.
+
+    The untouched-course list read the VIEWER's school picker, so a
+    super-admin on "All Schools" got every course on the platform attributed
+    to one student. A regular teacher never saw it — their picker is their own
+    school — which is why it survived.
+    """
+
+    def _elsewhere(self, name='Mont Fleuri'):
+        other = Institution.objects.create(name=name, slug=name.lower().replace(' ', '-'))
+        course = Course.objects.create(title=f'{name} Geography S3', institution=other)
+        unit = Unit.objects.create(course=course, title='U', order_index=0)
+        Lesson.objects.create(unit=unit, title='L', objective='o', order_index=0,
+                              is_published=True)
+        return other, course
+
+    def test_another_schools_course_is_not_listed(self, client, teacher,
+                                                   student, course, school):
+        _, theirs = self._elsewhere()
+
+        client.force_login(teacher)
+        response = client.get(reverse('dashboard:student_detail', args=[student.id]))
+
+        titles = [t['course'].title for t in response.context['course_tabs']]
+        assert course.title in titles
+        assert theirs.title not in titles
+
+    def test_a_platform_wide_course_is_still_listed(self, client, teacher,
+                                                    student, school):
+        """institution=None really is available to everyone."""
+        wide = Course.objects.create(title='Geography S1-S5', institution=None)
+        unit = Unit.objects.create(course=wide, title='U', order_index=0)
+        Lesson.objects.create(unit=unit, title='L', objective='o', order_index=0,
+                              is_published=True)
+
+        client.force_login(teacher)
+        response = client.get(reverse('dashboard:student_detail', args=[student.id]))
+        titles = [t['course'].title for t in response.context['course_tabs']]
+        assert 'Geography S1-S5' in titles
+
+    def test_work_done_elsewhere_is_still_their_record(self, client, teacher,
+                                                       student, school):
+        """A course the student actually worked stays, whoever owns it — a
+        transfer does not erase what they did."""
+        _, theirs = self._elsewhere()
+        lesson = theirs.units.first().lessons.first()
+        _progress(student, lesson, school, mastery_level='mastered',
+                  best_score=0.9)
+
+        client.force_login(teacher)
+        response = client.get(reverse('dashboard:student_detail', args=[student.id]))
+
+        tab = next(t for t in response.context['course_tabs']
+                   if t['course'].id == theirs.id)
+        assert tab['mastered_count'] == 1
