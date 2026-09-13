@@ -516,6 +516,20 @@ class Command(BaseCommand):
         if job.is_finished:
             raise CommandError(f'restore {job.pk} already {job.status}')
 
+        # Checked here as well as in dispatch(), because this command can be
+        # reached directly — a hand-run task, a retry, someone on a bastion —
+        # and `on_ecs` silently reading False is the difference between stopping
+        # the platform first and dropping the database out from under the tasks
+        # still serving it.
+        missing = restore_service.required_settings_missing()
+        if missing:
+            raise CommandError(
+                'This platform runs on ECS but the restore is not configured: '
+                + ', '.join(missing) + ' unset. Refusing to continue: without '
+                'these the platform cannot be stopped first, and the database '
+                'would be dropped while tasks are still using it. NOTHING HAS '
+                'BEEN CHANGED.')
+
         cluster = os.getenv('ECS_CLUSTER', '')
         service = os.getenv('ECS_SERVICE', '')
         on_ecs = bool(cluster and service)

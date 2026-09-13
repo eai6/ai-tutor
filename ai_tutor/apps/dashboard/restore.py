@@ -574,15 +574,56 @@ def _dispatch_via_subprocess(job) -> str:
     return f'pid:{process.pid}'
 
 
+def required_settings_missing() -> list[str]:
+    """What a restore on ECS still needs, or [] when it is fully configured.
+
+    Checked because the subprocess fallback is SAFE off ECS and CATASTROPHIC on
+    it. Running in-container means no scale-to-zero, no autoscaling suspension
+    and no idle wait — the restore would drop the production database while the
+    other web tasks are still serving from it, which is the 2026-08-08 collision
+    reproduced deliberately.
+
+    job_dispatch.py can fall through to a subprocess on partial configuration
+    because the worst case there is a material upload processed in the wrong
+    place. Here the worst case is the database. So this fails closed instead.
+    """
+    if not os.getenv('ECS_CLUSTER'):
+        return []                                      # genuinely not on ECS
+
+    missing = []
+    if not (os.getenv('ECS_RESTORE_TASK_DEFINITION')
+            or os.getenv('ECS_MIGRATE_TASK_DEFINITION')):
+        missing.append('ECS_MIGRATE_TASK_DEFINITION')
+    if not os.getenv('ECS_SUBNETS'):
+        missing.append('ECS_SUBNETS')
+    if not os.getenv('ECS_SERVICE'):
+        # Without this the restore cannot stop the platform, and would drop the
+        # database out from under the tasks still serving it.
+        missing.append('ECS_SERVICE')
+    return missing
+
+
 def dispatch(job) -> str:
     """Start the restore. Returns the task ARN, or a pid marker off ECS.
 
-    Same backend selection as apps/dashboard/job_dispatch.py, and the same
-    reason for it: one image runs in both places and each supplies only its own
-    environment. Azure is not supported — Container Apps has no equivalent of
-    scaling an ECS service to zero, so a correct restore there is different work
-    and a half-correct one is worse than none.
+    Backend selection follows apps/dashboard/job_dispatch.py — one image runs in
+    several places and each supplies only its own environment — with one
+    deliberate difference: a PARTIALLY configured ECS environment refuses rather
+    than falling back. See required_settings_missing().
+
+    Azure is not supported. Container Apps has no equivalent of scaling an ECS
+    service to zero, so a correct restore there is different work and a
+    half-correct one is worse than none.
     """
+    missing = required_settings_missing()
+    if missing:
+        raise RuntimeError(
+            'This platform runs on ECS but the restore is not configured: '
+            + ', '.join(missing) + ' unset. Refusing to fall back to running '
+            'the restore inside the web container, which would drop the '
+            'database while the other tasks are still serving from it. Apply '
+            'the infrastructure changes (pulumi up) first.')
+
     ecs = _ecs_settings()
     if ecs:
         arn = _dispatch_via_ecs(job, *ecs)

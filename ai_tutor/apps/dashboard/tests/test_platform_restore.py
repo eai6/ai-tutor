@@ -645,6 +645,9 @@ class TestDispatch:
         monkeypatch.setenv('ECS_CLUSTER', 'c')
         monkeypatch.setenv('ECS_MIGRATE_TASK_DEFINITION', 'aitutor-dev-migrate')
         monkeypatch.setenv('ECS_SUBNETS', 'subnet-1,subnet-2')
+        # Required: dispatch refuses a partly configured cluster rather than
+        # falling back into the web container. See TestAPartlyConfiguredEcsRefuses.
+        monkeypatch.setenv('ECS_SERVICE', 'aitutor-dev-service')
         monkeypatch.setattr(restore, '_dispatch_via_ecs', fake_run_task)
 
         job = RestoreJob.objects.create()
@@ -1049,3 +1052,80 @@ class TestAFailedRestoreCanBeDiagnosed:
         job = RestoreJob.objects.create()
         restore_service._dispatch_via_subprocess(job)
         assert (backup_service.backup_root() / f'restore-{job.pk}.log').is_file()
+
+
+@pytest.mark.django_db
+class TestAPartlyConfiguredEcsRefuses:
+    """The subprocess fallback is safe off ECS and catastrophic on it.
+
+    In-container means no scale-to-zero, no autoscaling suspension and no idle
+    wait — the restore would drop the production database while the other web
+    tasks are still serving from it. This is the exact environment the AWS stack
+    was in before the infrastructure change landed: ECS_CLUSTER and ECS_SUBNETS
+    set, everything else absent.
+    """
+
+    def _partly(self, monkeypatch):
+        monkeypatch.setenv('ECS_CLUSTER', 'aitutor-dev-cluster')
+        monkeypatch.setenv('ECS_SUBNETS', 'subnet-1,subnet-2')
+        for var in ('ECS_SERVICE', 'ECS_RESTORE_TASK_DEFINITION',
+                    'ECS_MIGRATE_TASK_DEFINITION'):
+            monkeypatch.delenv(var, raising=False)
+
+    def test_dispatch_refuses_instead_of_running_in_the_web_container(
+            self, lock_dir, monkeypatch):
+        from ai_tutor.apps.dashboard import restore as restore_service
+        self._partly(monkeypatch)
+
+        def must_not_run(job):
+            pytest.fail('fell back to a subprocess on ECS')
+
+        monkeypatch.setattr(restore_service, '_dispatch_via_subprocess', must_not_run)
+        job = RestoreJob.objects.create()
+        with pytest.raises(RuntimeError, match='not configured'):
+            restore_service.dispatch(job)
+
+    def test_it_names_what_is_missing(self, lock_dir, monkeypatch):
+        from ai_tutor.apps.dashboard import restore as restore_service
+        self._partly(monkeypatch)
+        missing = restore_service.required_settings_missing()
+        assert 'ECS_SERVICE' in missing
+        assert 'ECS_MIGRATE_TASK_DEFINITION' in missing
+
+    def test_the_command_refuses_too(self, db, tmp_path, settings, monkeypatch):
+        """Reachable directly — a hand-run task, a retry, someone on a bastion."""
+        from django.core.management import call_command
+        from django.core.management.base import CommandError
+        from ai_tutor.apps.dashboard import backup as backup_service
+
+        settings.BACKUP_ROOT = tmp_path / 'backups'
+        settings.AWS_BACKUP_BUCKET = ''
+        backup = BackupJob.objects.create(status=BackupJob.Status.DONE,
+                                          summary=_manifest(),
+                                          storage_key='backups/x.tar.gz')
+        job = RestoreJob.objects.create(source_backup=backup,
+                                        source_key=backup.storage_key)
+        self._partly(monkeypatch)
+
+        def must_not_run(*a, **kw):
+            pytest.fail('a safety backup was started on a refused restore')
+
+        monkeypatch.setattr(backup_service, 'build', must_not_run)
+        with pytest.raises(CommandError, match='NOTHING HAS BEEN CHANGED'):
+            call_command('restore_backup', job=job.pk)
+
+    def test_a_fully_configured_ecs_is_allowed(self, lock_dir, monkeypatch):
+        from ai_tutor.apps.dashboard import restore as restore_service
+        self._partly(monkeypatch)
+        monkeypatch.setenv('ECS_SERVICE', 'aitutor-dev-service')
+        monkeypatch.setenv('ECS_MIGRATE_TASK_DEFINITION', 'aitutor-dev-migrate')
+        assert restore_service.required_settings_missing() == []
+
+    def test_off_ecs_the_subprocess_fallback_is_still_fine(self, lock_dir,
+                                                           monkeypatch):
+        """Dev and single-server installs have no cluster to be confused about."""
+        from ai_tutor.apps.dashboard import restore as restore_service
+        for var in ('ECS_CLUSTER', 'ECS_SUBNETS', 'ECS_SERVICE',
+                    'ECS_RESTORE_TASK_DEFINITION', 'ECS_MIGRATE_TASK_DEFINITION'):
+            monkeypatch.delenv(var, raising=False)
+        assert restore_service.required_settings_missing() == []
