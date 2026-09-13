@@ -571,3 +571,129 @@ class BackupJob(models.Model):
         if not (self.started_at and self.finished_at):
             return None
         return int((self.finished_at - self.started_at).total_seconds())
+
+
+class RestoreJob(models.Model):
+    """One attempt to put an archive back: database, media, and what it cost.
+
+    The mirror of BackupJob, with one difference that shapes everything else:
+    **this row does not survive its own job.** Step five of a restore drops the
+    database that holds it, and what comes back is the archive's version of this
+    table — which knows nothing about the restore in progress. So:
+
+      - Progress during the destructive window lives in an S3 status object, not
+        here. This row is only accurate before the drop and after the re-insert.
+      - The task writes a finished row back into the restored database when it
+        succeeds. Without that, a successful restore leaves no trace it happened.
+      - `safety_backup_key` is a plain string rather than a ForeignKey to the
+        BackupJob it came from, because that BackupJob row is dropped too. The
+        S3 object survives; the key is how anyone finds it afterwards. Do not
+        "fix" this into a relation.
+
+    On the single-restore guarantee, which is split deliberately across two
+    mechanisms because neither covers the whole window:
+
+      - The partial unique index below stops two *dispatches*. That is the race
+        a human can actually cause — two superadmins, or one double-click, while
+        the site is up and the settings page is reachable. It is the same
+        proven guard BackupJob uses, and it holds right up to the drop.
+      - It stops covering anything the moment the database goes. From then until
+        the row is re-inserted there is no index, because there is no table. The
+        service is scaled to zero by then so the UI cannot start a second
+        restore — but a hand-run management command on a bastion can, which is
+        why dashboard/restore_lock.py checks the cluster for another restore
+        task before touching anything.
+
+    Keeping only one of the two would leave a real gap. The index alone was the
+    original design and is not sufficient; dropping it in favour of the task
+    check alone would weaken the dispatch path for nothing.
+    """
+
+    class Status(models.TextChoices):
+        PENDING = 'pending', 'Pending'
+        RUNNING = 'running', 'Running'
+        DONE = 'done', 'Done'
+        FAILED = 'failed', 'Failed'
+
+    class Source(models.TextChoices):
+        # An archive this platform took, still listed on the settings page.
+        ARCHIVE = 'backup', 'Existing backup'
+        # One uploaded from somewhere else — a laptop, another environment, a
+        # copy a ministry kept. Database-only; a full archive is too large to
+        # upload and is restored from the bucket instead.
+        UPLOAD = 'upload', 'Uploaded archive'
+
+    status = models.CharField(max_length=10, choices=Status.choices,
+                              default=Status.PENDING, db_index=True)
+    # Who authorised it. SET_NULL for the same reason as BackupJob: losing the
+    # audit trail is worse than a row with an empty author.
+    created_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='restore_jobs',
+    )
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    started_at = models.DateTimeField(null=True, blank=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
+
+    source = models.CharField(max_length=10, choices=Source.choices,
+                              default=Source.ARCHIVE)
+    # Kept for the list view. SET_NULL because the archive it points at may be
+    # expired by the bucket's 90-day rule long before this row stops mattering.
+    source_backup = models.ForeignKey(
+        BackupJob, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='restores',
+    )
+    # The archive actually read: an S3 key, or an absolute path off S3.
+    source_key = models.CharField(max_length=500, blank=True)
+    include_media = models.BooleanField(default=False)
+
+    # What the archive says about itself, copied at preflight so the
+    # confirmation page and the task agree on what was approved.
+    manifest = models.JSONField(default=dict, blank=True)
+    # What preflight concluded: whether the checksum could be verified, how the
+    # archive's migration heads compare to this code, and the row-count diff
+    # the superadmin was shown before they confirmed.
+    preflight = models.JSONField(default=dict, blank=True)
+
+    # Where the two safety nets ended up, recorded BEFORE anything is dropped.
+    # The snapshot is the one that cannot half-succeed; the archive is the one
+    # that can be carried off AWS. Strings, not relations — see the docstring.
+    safety_backup_key = models.CharField(max_length=500, blank=True)
+    rds_snapshot_id = models.CharField(max_length=255, blank=True)
+
+    # The ECS task doing the work. This is the liveness signal a reaper must
+    # use: wall-clock alone cannot tell a slow restore from a dead one, and the
+    # web process is scaled to zero for most of a real restore anyway.
+    task_arn = models.CharField(max_length=255, blank=True)
+
+    stage = models.CharField(max_length=120, blank=True)
+    progress = models.PositiveSmallIntegerField(default=0)
+    error = models.TextField(blank=True)
+
+    # Always True; it exists only to give the partial unique index below
+    # something to collide on. See the constraint.
+    active_marker = models.BooleanField(default=True, editable=False)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [models.Index(fields=['-created_at', 'status'])]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['active_marker'],
+                condition=models.Q(status__in=['pending', 'running']),
+                name='dashboard_one_active_restore',
+            ),
+        ]
+
+    def __str__(self):
+        return f"Restore {self.pk} ({self.status})"
+
+    @property
+    def is_finished(self) -> bool:
+        return self.status in (self.Status.DONE, self.Status.FAILED)
+
+    @property
+    def duration_seconds(self) -> int | None:
+        if not (self.started_at and self.finished_at):
+            return None
+        return int((self.finished_at - self.started_at).total_seconds())
