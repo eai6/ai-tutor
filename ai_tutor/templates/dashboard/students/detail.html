@@ -5,14 +5,6 @@
 {% block page_title %}{% trans "Student Progress" %}{% endblock %}
 
 {% block content %}
-<!-- Back link -->
-<a href="{% url 'dashboard:student_list' %}" style="display: inline-flex; align-items: center; gap: 0.5rem; color: var(--gray-500); text-decoration: none; margin-bottom: 1.25rem;">
-    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
-    </svg>
-    {% trans "Back to Students" %}
-</a>
-
 <!-- Student Header -->
 <div style="display:flex; justify-content:space-between; align-items:flex-end; gap:2rem; flex-wrap:wrap; margin-bottom:1.25rem;">
     <div style="display: flex; align-items: center; gap: 1.25rem;">

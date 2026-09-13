@@ -44,10 +44,6 @@
     .empty-state h3 { color:#374151; margin:0.5rem 0; }
 </style>
 
-<div style="margin-bottom:1rem;">
-    <a href="{% url 'dashboard:course_detail' course.id %}" style="color:#6b7280;font-size:0.85rem;text-decoration:none;">← {% blocktrans with title=course.title %}Back to {{ title }}{% endblocktrans %}</a>
-</div>
-
 <div class="summary-row">
     <div class="summary-card" style="background:linear-gradient(135deg,#5b21b6 0%,#8b5cf6 100%);color:#fff;border:none;">
         <div class="label" style="color:rgba(255,255,255,0.8);">{% trans "Class readiness" %}</div>

@@ -268,10 +268,6 @@
 {% endblock %}
 
 {% block content %}
-<a href="{% url 'dashboard:lesson_detail' lesson.id %}" style="display:inline-flex;align-items:center;gap:0.5rem;color:#71717a;text-decoration:none;margin-bottom:1rem;">
-    &larr; {% blocktrans with title=lesson.title %}Back to {{ title }}{% endblocktrans %}
-</a>
-
 <!-- Header -->
 <div class="report-header">
     <div>

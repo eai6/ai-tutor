@@ -25,7 +25,6 @@
 </style>
 
 <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;margin-bottom:1rem;">
-    <a href="{% url 'dashboard:course_detail' course.id %}" style="color:var(--gray-500);font-size:0.85rem;text-decoration:none;">← {% blocktrans with title=course.title %}Back to {{ title }}{% endblocktrans %}</a>
     <div style="display:flex;gap:0.4rem;">
         {% if summative %}
         <form method="post" action="{% url 'dashboard:summative_generate' course.id %}" style="display:inline;">

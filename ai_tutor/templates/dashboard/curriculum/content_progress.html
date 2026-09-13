@@ -70,12 +70,6 @@
 {% endblock %}
 
 {% block content %}
-{% if course %}
-<a href="{% url 'dashboard:course_detail' course.id %}" style="display: inline-flex; align-items: center; gap: 0.5rem; color: var(--gray-500); text-decoration: none; margin-bottom: 1rem;">
-    ← {% blocktrans with title=course.title %}Back to {{ title }}{% endblocktrans %}
-</a>
-{% endif %}
-
 <div class="progress-card">
     <div class="progress-header">
         <div style="display: flex; justify-content: space-between; align-items: center;">

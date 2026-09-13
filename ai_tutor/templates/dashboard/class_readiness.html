@@ -129,10 +129,6 @@
 {% endblock %}
 
 {% block content %}
-<a href="{% url 'dashboard:course_detail' course.id %}" style="display:inline-flex;align-items:center;gap:0.5rem;color:#71717a;text-decoration:none;margin-bottom:1rem;">
-    &larr; {% blocktrans with title=course.title %}Back to {{ title }}{% endblocktrans %}
-</a>
-
 <div class="readiness-header">
     <h2 style="margin:0 0 0.25rem;">{% trans "Class Readiness Report" %}</h2>
     <p style="color:#71717a;margin:0;">{{ course.title }} &mdash; {% blocktrans count count=total_students %}{{ count }} student{% plural %}{{ count }} students{% endblocktrans %} &mdash; {% blocktrans count count=total_objectives %}{{ count }} enabling objective{% plural %}{{ count }} enabling objectives{% endblocktrans %}</p>

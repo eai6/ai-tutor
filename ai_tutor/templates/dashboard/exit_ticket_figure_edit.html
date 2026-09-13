@@ -32,13 +32,6 @@
 {% endblock %}
 
 {% block content %}
-<div style="margin-bottom: 1rem;">
-    <a href="{% url 'dashboard:lesson_detail' question.exit_ticket.lesson.id %}"
-       style="font-size: 0.85rem; color: #64748b; text-decoration: none;">
-        ← {% trans "Back to lesson" %}
-    </a>
-</div>
-
 <div class="question-text">
     <strong>{% blocktrans with n=question.order_index|add:1 %}Q{{ n }}.{% endblocktrans %}</strong>
     {{ question.question_text }}

@@ -31,10 +31,6 @@
 {% endblock %}
 
 {% block content %}
-<a href="{% url 'dashboard:lesson_detail' lesson.id %}" style="display: inline-flex; align-items: center; gap: 0.5rem; color: var(--gray-500); text-decoration: none; margin-bottom: 1rem;">
-    ← {% blocktrans with title=lesson.title %}Back to {{ title }}{% endblocktrans %}
-</a>
-
 <div class="card" style="max-width: 800px;">
     <div class="card-header">
         <h3 class="card-title">{% blocktrans with n=step.order_index|add:1 %}Edit Step {{ n }}{% endblocktrans %}</h3>

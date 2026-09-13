@@ -164,10 +164,6 @@
 {% endblock %}
 
 {% block content %}
-<a href="{% url 'dashboard:course_detail' course.id %}" style="display: inline-flex; align-items: center; gap: 0.5rem; color: var(--gray-500); text-decoration: none; margin-bottom: 1rem;">
-    ← {% blocktrans with title=course.title %}Back to {{ title }}{% endblocktrans %}
-</a>
-
 <div id="lesson-live-region" data-is-generating="{% if is_generating %}1{% else %}0{% endif %}">
 {% if is_generating %}
 <div style="background:#dbeafe; border:1px solid #93c5fd; border-radius:10px; padding:0.85rem 1.1rem; margin-bottom:1rem; display:flex; align-items:center; gap:0.75rem;">

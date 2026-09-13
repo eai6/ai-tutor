@@ -162,14 +162,10 @@
 .override-btn.active.incorrect { background: #dc2626; color: #fff; border-color: #dc2626; }
 .override-spinner { font-size: 0.7rem; color: #6366f1; }
 
-.back-link { color: #3b82f6; text-decoration: none; font-size: 0.875rem; }
-.back-link:hover { text-decoration: underline; }
 </style>
 {% endblock %}
 
 {% block content %}
-<a href="{% url 'dashboard:lesson_monitor' lesson.id %}" class="back-link">← {% trans "Back to Live Monitor" %}</a>
-
 <div class="review-header" style="margin-top: 0.75rem;">
     <div>
         <h2>{{ student_name }}</h2>

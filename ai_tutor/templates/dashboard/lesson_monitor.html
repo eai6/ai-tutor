@@ -118,17 +118,6 @@
 }
 .btn-view:hover { background: #4f46e5; }
 
-.back-link {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.25rem;
-    color: var(--primary);
-    text-decoration: none;
-    font-size: 0.875rem;
-    font-weight: 600;
-    margin-bottom: 1rem;
-}
-.back-link:hover { text-decoration: underline; }
 
 .refresh-note {
     font-size: 0.75rem;
@@ -212,8 +201,6 @@
 {% endblock %}
 
 {% block content %}
-<a href="{% url 'dashboard:lesson_detail' lesson.id %}" class="back-link">&larr; {% trans "Back to Lesson" %}</a>
-
 <div class="monitor-header">
     <div>
         <h2>{{ lesson.title }}</h2>

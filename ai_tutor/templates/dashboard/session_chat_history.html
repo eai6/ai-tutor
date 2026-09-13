@@ -16,17 +16,6 @@
 .chat-header h2 { margin: 0; font-size: 1.25rem; }
 .chat-meta { color: #71717a; font-size: 0.875rem; margin-top: 0.25rem; }
 
-.back-link {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.25rem;
-    color: var(--primary);
-    text-decoration: none;
-    font-size: 0.875rem;
-    font-weight: 600;
-    margin-bottom: 1rem;
-}
-.back-link:hover { text-decoration: underline; }
 
 /* Info cards */
 .info-cards {
@@ -185,8 +174,6 @@
 {% endblock %}
 
 {% block content %}
-<a href="{% url 'dashboard:lesson_monitor' lesson.id %}" class="back-link">&larr; {% trans "Back to Monitor" %}</a>
-
 <div class="chat-header">
     <div>
         <h2>{{ student_name }}</h2>

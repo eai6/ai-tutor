@@ -5,10 +5,6 @@
 {% block page_title %}{% blocktrans with g=grade %}{{ g }} class{% endblocktrans %}{% endblock %}
 
 {% block content %}
-<a href="{% url 'dashboard:class_list' %}" style="display:inline-flex; align-items:center; gap:0.4rem; color:var(--gray-500); text-decoration:none; margin-bottom:1rem;">
-    &larr; {% trans "All classes" %}
-</a>
-
 <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:1.25rem; gap:2rem; flex-wrap:wrap;">
     <div>
         <h1 style="margin:0; font-size:1.6rem;">{{ grade }}</h1>
