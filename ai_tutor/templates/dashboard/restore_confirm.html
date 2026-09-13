@@ -134,6 +134,14 @@
         {% csrf_token %}
         <input type="hidden" name="token" value="{{ token }}">
 
+        {% if confirm_error %}
+        {# A mistyped name returns here rather than to settings, so the checks #}
+        {# and the diff are still in front of them while they correct it.      #}
+        <p style="background:#fef2f2;border:1px solid #fca5a5;color:#991b1b;
+                  border-radius:8px;padding:0.6rem 0.9rem;font-size:0.875rem;
+                  margin-bottom:1rem;">{{ confirm_error }}</p>
+        {% endif %}
+
         <label style="display:block;font-size:0.875rem;margin-bottom:0.5rem;">
           {% blocktrans trimmed with name=platform_name %}
             Type <strong>{{ name }}</strong> to confirm.

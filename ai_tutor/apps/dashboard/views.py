@@ -10095,9 +10095,9 @@ def _issue_confirm_token(request, *, key: str, backup_id) -> str:
     return token
 
 
-def _spend_confirm_token(request, token: str) -> dict | None:
-    held = request.session.pop(f'restore_confirm:{token}', None)
-    request.session.modified = True
+def _read_confirm_token(request, token: str) -> dict | None:
+    """Look at a token without consuming it."""
+    held = request.session.get(f'restore_confirm:{token}')
     if not held:
         return None
     issued = datetime.fromisoformat(held['issued_at'])
@@ -10106,14 +10106,34 @@ def _spend_confirm_token(request, token: str) -> dict | None:
     return held
 
 
-@superuser_required
-@require_POST
-def restore_preflight(request):
-    """Check an archive and show what restoring it would do. Destroys nothing."""
-    from ai_tutor.apps.dashboard import restore as restore_service
+def _spend_confirm_token(request, token: str) -> dict | None:
+    """Consume a token. Single-use, so a repeat POST cannot start a second
+    restore — but consumed only once the request is definitely going ahead.
 
-    backup_id = request.POST.get('backup_id') or None
-    key = (request.POST.get('key') or '').strip()
+    Reading and spending are separate because a mistyped platform name used to
+    burn the confirmation before it was checked. The retry then failed with
+    "expired or was already used", which is both wrong and alarming: it reads
+    as though something happened, when in fact a typo had simply thrown away a
+    perfectly good confirmation.
+    """
+    held = _read_confirm_token(request, token)
+    request.session.pop(f'restore_confirm:{token}', None)
+    request.session.modified = True
+    return held
+
+
+def _render_restore_confirmation(request, *, backup_id=None, key='',
+                                 token='', error=''):
+    """The confirmation page, from either the first look or a corrected retry.
+
+    Shared so a retry shows exactly what the first attempt did — the checks, the
+    diff, and the platform name to type. Re-running preflight here is deliberate
+    rather than wasteful: it is cheap for a listed archive (a database read, no
+    S3 bytes) and the row counts should be current at the moment of decision,
+    not from whenever the page was first opened.
+    """
+    from ai_tutor.apps.dashboard import restore as restore_service
+    from ai_tutor.apps.accounts.models import PlatformConfig
 
     backup = None
     if backup_id:
@@ -10131,9 +10151,6 @@ def restore_preflight(request):
         messages.error(request, str(exc))
         return redirect('dashboard:settings')
 
-    _log_restore_event(request, 'preflight', key=key, ok=report['ok'])
-
-    from ai_tutor.apps.accounts.models import PlatformConfig
     config = PlatformConfig.load()
     # The manifest stores an ISO string; the page should read like the rest of
     # the dashboard, not like a log line.
@@ -10148,8 +10165,10 @@ def restore_preflight(request):
         'taken_at': taken_at,
         'backup': backup,
         'key': key,
-        'platform_name': config.platform_name or 'AI Tutor',
-        'token': _issue_confirm_token(
+        'confirm_error': error,
+        'platform_name': (config.platform_name or 'AI Tutor').strip(),
+        # A retry keeps the token it already had — it was never spent.
+        'token': token or _issue_confirm_token(
             request, key=key, backup_id=backup.pk if backup else None),
         # Shown rather than guessed at: a restore of a large archive is not
         # quick and the platform is offline throughout.
@@ -10159,11 +10178,22 @@ def restore_preflight(request):
 
 @superuser_required
 @require_POST
+def restore_preflight(request):
+    """Check an archive and show what restoring it would do. Destroys nothing."""
+    backup_id = request.POST.get('backup_id') or None
+    key = (request.POST.get('key') or '').strip()
+    _log_restore_event(request, 'preflight', key=key or f'backup:{backup_id}')
+    return _render_restore_confirmation(request, backup_id=backup_id, key=key)
+
+
+@superuser_required
+@require_POST
 def restore_start(request):
     """Begin the restore. This is the point of no return."""
     from ai_tutor.apps.dashboard import restore as restore_service
 
-    held = _spend_confirm_token(request, request.POST.get('token', ''))
+    token = request.POST.get('token', '')
+    held = _read_confirm_token(request, token)
     if not held:
         messages.error(
             request,
@@ -10173,9 +10203,25 @@ def restore_start(request):
 
     from ai_tutor.apps.accounts.models import PlatformConfig
     expected = (PlatformConfig.load().platform_name or 'AI Tutor').strip()
-    if (request.POST.get('confirm_name') or '').strip() != expected:
-        messages.error(request, "The platform name did not match. Nothing has "
-                                "been changed.")
+    typed = (request.POST.get('confirm_name') or '').strip()
+    if typed.casefold() != expected.casefold():
+        # Re-rendered, not redirected. Sending them back to settings threw away
+        # the one screen that says what to type and the diff they were reading
+        # when they decided — and the token was already spent by then, so the
+        # correction failed with "expired or was already used". One typo cost
+        # the whole confirmation and the second message blamed the wrong thing.
+        #
+        # casefold rather than ==: this friction exists to make the action
+        # deliberate, not to test typing. Exact case adds nothing a second
+        # attempt would not also pass.
+        return _render_restore_confirmation(
+            request, backup_id=held['backup_id'], key=held['key'], token=token,
+            error=f'That did not match. Type the platform name exactly: '
+                  f'{expected}')
+
+    if not _spend_confirm_token(request, token):
+        messages.error(request, "That confirmation was already used. Nothing "
+                                "has been changed.")
         return redirect('dashboard:settings')
 
     restore_service.reap_stale()

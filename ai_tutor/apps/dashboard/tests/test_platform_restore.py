@@ -1249,3 +1249,92 @@ class TestAStubSummaryIsNotMistakenForAManifest:
         report = restore_service.preflight(backup=backup)
         assert report['manifest_source'] == 'sidecar manifest'
         assert report['ok'], report['blocking']
+
+
+@pytest.mark.django_db
+class TestATypoDoesNotCostTheConfirmation:
+    """The token used to be spent before the name was checked, so one mistyped
+    character threw away a perfectly good confirmation — and the retry then
+    failed with "expired or was already used", which blamed the wrong thing and
+    read as though something had happened."""
+
+    def _confirm_page(self, client, superuser):
+        from django.urls import reverse
+        backup = BackupJob.objects.create(status=BackupJob.Status.DONE,
+                                          summary=_manifest(),
+                                          storage_key='backups/x.tar.gz')
+        client.force_login(superuser)
+        response = client.post(reverse('dashboard:restore_preflight'),
+                               {'backup_id': backup.pk})
+        return response.context['token'], response.context['platform_name']
+
+    def test_the_same_token_still_works_after_a_wrong_name(
+            self, client, superuser, lock_dir, monkeypatch):
+        from django.urls import reverse
+        from ai_tutor.apps.dashboard import restore as restore_service
+        monkeypatch.setattr(restore_service, 'dispatch', lambda job: 'pid:0')
+
+        token, name = self._confirm_page(client, superuser)
+
+        wrong = client.post(reverse('dashboard:restore_start'),
+                            {'token': token, 'confirm_name': 'nonsense'})
+        assert wrong.status_code == 200, 'a typo should not redirect away'
+        assert not RestoreJob.objects.exists()
+
+        # The correction uses the SAME token and must go through.
+        client.post(reverse('dashboard:restore_start'),
+                    {'token': token, 'confirm_name': name})
+        assert RestoreJob.objects.count() == 1, \
+            'the typo burned the confirmation'
+
+    def test_the_retry_page_still_shows_the_checks_and_the_diff(
+            self, client, superuser, lock_dir):
+        from django.urls import reverse
+        token, name = self._confirm_page(client, superuser)
+        response = client.post(reverse('dashboard:restore_start'),
+                               {'token': token, 'confirm_name': 'nonsense'})
+        body = response.content.decode()
+        assert 'did not match' in body
+        assert name in body, 'the page must say what to type'
+        assert 'What would change' in body or 'Checks' in body
+
+    def test_case_does_not_have_to_match(self, client, superuser, lock_dir,
+                                         monkeypatch):
+        """The friction exists to make the action deliberate, not to test
+        typing. Exact case adds nothing a second attempt would not pass."""
+        from django.urls import reverse
+        from ai_tutor.apps.dashboard import restore as restore_service
+        monkeypatch.setattr(restore_service, 'dispatch', lambda job: 'pid:0')
+
+        token, name = self._confirm_page(client, superuser)
+        client.post(reverse('dashboard:restore_start'),
+                    {'token': token, 'confirm_name': name.upper()})
+        assert RestoreJob.objects.count() == 1
+
+    def test_a_spent_token_is_still_single_use(self, client, superuser,
+                                               lock_dir, monkeypatch):
+        """Loosening the typo path must not loosen the repeat-POST guard."""
+        from django.urls import reverse
+        from ai_tutor.apps.dashboard import restore as restore_service
+        monkeypatch.setattr(restore_service, 'dispatch', lambda job: 'pid:0')
+
+        token, name = self._confirm_page(client, superuser)
+        client.post(reverse('dashboard:restore_start'),
+                    {'token': token, 'confirm_name': name})
+        assert RestoreJob.objects.count() == 1
+
+        client.post(reverse('dashboard:restore_start'),
+                    {'token': token, 'confirm_name': name})
+        assert RestoreJob.objects.count() == 1, 'the token was accepted twice'
+
+    def test_the_expected_name_comes_from_the_platform_not_a_default(
+            self, client, superuser, lock_dir):
+        """On the deployed platform it is "Sesel AI", not "AI Tutor" — the page
+        has to show whatever this platform is actually called."""
+        from ai_tutor.apps.accounts.models import PlatformConfig
+        config = PlatformConfig.load()
+        config.platform_name = 'Sesel AI'
+        config.save()
+
+        _, shown = self._confirm_page(client, superuser)
+        assert shown == 'Sesel AI'
