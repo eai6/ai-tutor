@@ -759,6 +759,106 @@
             </p>
         </div>
     </div>
+
+    {# ── Restore ────────────────────────────────────────────────────────── #}
+    {# Its own card, below the backups, and gated on is_superuser rather than #}
+    {# is_superadmin: taking a copy and destroying everything are not the same #}
+    {# privilege. See superuser_required in views.py.                         #}
+    {% if request.user.is_superuser %}
+    <div class="card" style="margin-bottom:1.5rem;border:1px solid #fca5a5;">
+        <div class="card-header">
+            <h3 class="card-title">{% trans "Restore from backup" %}</h3>
+        </div>
+        <div class="card-body">
+            <p style="color:var(--gray-500);font-size:0.875rem;margin-bottom:1rem;">
+                {% blocktrans trimmed %}
+                    Replace everything on this platform with the contents of an
+                    archive. The platform goes offline while it runs, a copy of
+                    the current data is taken first, and you will be shown exactly
+                    what would change before anything happens.
+                {% endblocktrans %}
+            </p>
+
+            {% if restore_running %}
+            <p style="background:#fffbeb;border:1px solid #fcd34d;color:#92400e;
+                      border-radius:8px;padding:0.75rem 1rem;font-size:0.85rem;">
+                <span id="restore-live">{% trans "A restore is running." %}</span>
+            </p>
+            {% endif %}
+
+            {% if restorable_backups %}
+            <table class="table" style="width:100%;font-size:0.875rem;">
+                <thead>
+                    <tr>
+                        <th>{% trans "Taken" %}</th>
+                        <th>{% trans "Contents" %}</th>
+                        <th>{% trans "Size" %}</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for job in restorable_backups %}
+                    <tr>
+                        <td>{{ job.created_at|date:"Y-m-d H:i" }}</td>
+                        <td>{% if job.include_media %}{% trans "Database + media" %}
+                            {% else %}{% trans "Database only" %}{% endif %}</td>
+                        <td>{% if job.size_bytes %}{{ job.size_bytes|filesizeformat }}{% else %}—{% endif %}</td>
+                        <td>
+                            <form method="post" action="{% url 'dashboard:restore_preflight' %}">
+                                {% csrf_token %}
+                                <input type="hidden" name="backup_id" value="{{ job.pk }}">
+                                <button type="submit" class="btn btn-secondary"
+                                        style="padding:0.25rem 0.6rem;font-size:0.8rem;
+                                               background:#fee2e2;color:#991b1b;
+                                               border:1px solid #fca5a5;">
+                                    {% trans "Restore…" %}
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p style="color:var(--gray-500);font-size:0.875rem;">
+                {% trans "No archives available to restore from." %}
+            </p>
+            {% endif %}
+
+            <div style="border-top:1px solid var(--gray-200);margin-top:1.25rem;
+                        padding-top:1.25rem;">
+                <h4 style="font-size:0.85rem;margin:0 0 0.5rem;">
+                    {% trans "Or upload an archive from somewhere else" %}</h4>
+                <form method="post" action="{% url 'dashboard:restore_upload' %}"
+                      enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <input type="file" name="archive" accept=".gz,.tgz,.tar.gz" required
+                           style="font-size:0.85rem;">
+                    <button type="submit" class="btn btn-secondary"
+                            style="margin-left:0.5rem;">{% trans "Upload" %}</button>
+                </form>
+                <p style="color:var(--gray-500);font-size:0.8rem;margin-top:0.5rem;">
+                    {% blocktrans trimmed %}
+                        Database-only archives, up to 500 MB. A full archive including
+                        uploaded files is far larger than a browser upload can carry —
+                        restore one of those from the list above instead.
+                    {% endblocktrans %}
+                </p>
+                {% if uploaded_restore_key %}
+                <form method="post" action="{% url 'dashboard:restore_preflight' %}"
+                      style="margin-top:0.75rem;">
+                    {% csrf_token %}
+                    <input type="hidden" name="key" value="{{ uploaded_restore_key }}">
+                    <button type="submit" class="btn btn-secondary"
+                            style="background:#fee2e2;color:#991b1b;border:1px solid #fca5a5;">
+                        {% trans "Check the uploaded archive…" %}
+                    </button>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
     {% endif %}
 
 </div>

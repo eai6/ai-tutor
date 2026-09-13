@@ -11,8 +11,9 @@ Provides:
 import json
 import logging
 import os
+import uuid
 import zoneinfo
-from datetime import date as _date, timedelta
+from datetime import date as _date, datetime, timedelta
 from pathlib import Path
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
@@ -30,7 +31,7 @@ from django.views.decorators.http import require_POST
 from ai_tutor.apps.accounts.models import Institution, Membership, StudentProfile, PlatformConfig
 from ai_tutor.apps.curriculum.models import Course, Unit, Lesson
 from ai_tutor.apps.tutoring.models import TutorSession, StudentLessonProgress
-from ai_tutor.apps.dashboard.models import BackupJob
+from ai_tutor.apps.dashboard.models import BackupJob, RestoreJob
 from django.contrib.auth.models import User
 from django.contrib.auth import update_session_auth_hash, logout
 
@@ -4020,6 +4021,19 @@ def settings_page(request):
             bool(getattr(django_settings, 'USE_S3_MEDIA', False))
             and not backup_service.backup_bucket()
         )
+
+        # Restore is superUSER-only, a stricter gate than the rest of this page
+        # — see superuser_required. Only finished archives can be restored from.
+        if request.user.is_superuser:
+            from ai_tutor.apps.dashboard import restore as restore_service
+            restore_service.reap_stale()
+            context['restorable_backups'] = BackupJob.objects.filter(
+                status=BackupJob.Status.DONE).exclude(storage_key='')[:10]
+            context['restore_running'] = RestoreJob.objects.filter(
+                status__in=(RestoreJob.Status.PENDING,
+                            RestoreJob.Status.RUNNING)).exists()
+            context['uploaded_restore_key'] = request.session.get(
+                'restore_uploaded_key', '')
 
     return render(request, 'dashboard/settings.html', context)
 
@@ -10009,3 +10023,321 @@ def backup_download(request, job_id: int):
     if not path.is_file() or root not in path.resolve().parents:
         raise Http404
     return FileResponse(path.open('rb'), as_attachment=True, filename=path.name)
+
+
+# ============================================================================
+# Platform restore — putting an archive back. See apps/dashboard/restore.py for
+# the checks and apps/dashboard/management/commands/restore_backup.py for the
+# work. These views only decide and dispatch; none of them destroys anything.
+# ============================================================================
+
+# The cap on an uploaded archive. Database-only archives are tens of megabytes;
+# a full one is gigabytes and is restored by selecting it from the bucket, not
+# by pushing it back through a browser.
+MAX_UPLOAD_BYTES = 500 * 1024 * 1024
+
+# How long a confirmation stays valid. Long enough to read the page properly,
+# short enough that a tab left open overnight cannot be submitted by someone
+# else at the keyboard.
+CONFIRM_TOKEN_TTL_SECONDS = 30 * 60
+
+
+def superuser_required(view_func):
+    """Stricter than superadmin_required, on purpose.
+
+    superadmin_required checks is_staff — and is_staff is a flag an existing
+    superadmin hands out from the staff list, one toggle away for any account.
+    For a backup the risk that buys is exfiltration. For a restore it is
+    "revert the platform to an arbitrary earlier state, and take it offline for
+    an hour doing it". Those should not share a gate.
+    """
+    @login_required
+    def wrapper(request, *args, **kwargs):
+        if not request.user.is_superuser:
+            raise Http404
+        ctx = get_staff_context(request)
+        if not ctx:
+            raise Http404
+        request.staff_ctx = ctx
+        return view_func(request, *args, **kwargs)
+    return wrapper
+
+
+def _log_restore_event(request, action: str, **extra):
+    from ai_tutor.apps.safety.models import SafetyAuditLog
+    SafetyAuditLog.objects.create(
+        event_type=SafetyAuditLog.EventType.DATA_EXPORT,
+        user_id=request.user.id,
+        # Not 'warning' like a backup. This destroys data.
+        severity='critical',
+        details={'action': f'restore_{action}', 'scope': 'platform', **extra},
+        ip_address=request.META.get('REMOTE_ADDR'),
+        user_agent=request.META.get('HTTP_USER_AGENT', '')[:500],
+    )
+
+
+def _issue_confirm_token(request, *, key: str, backup_id) -> str:
+    """A server-issued, single-use token tying a confirmation to one archive.
+
+    Typing the platform name defends against a misclick. It does not defend
+    against a forged POST from a logged-in superadmin, because everything it
+    asks for is visible on the page doing the asking. This is stored server-side
+    and spent on use, so the destructive request cannot be reconstructed from
+    the confirmation page's own contents.
+    """
+    token = uuid.uuid4().hex
+    request.session[f'restore_confirm:{token}'] = {
+        'key': key,
+        'backup_id': backup_id,
+        'issued_at': timezone.now().isoformat(),
+    }
+    request.session.modified = True
+    return token
+
+
+def _spend_confirm_token(request, token: str) -> dict | None:
+    held = request.session.pop(f'restore_confirm:{token}', None)
+    request.session.modified = True
+    if not held:
+        return None
+    issued = datetime.fromisoformat(held['issued_at'])
+    if (timezone.now() - issued).total_seconds() > CONFIRM_TOKEN_TTL_SECONDS:
+        return None
+    return held
+
+
+@superuser_required
+@require_POST
+def restore_preflight(request):
+    """Check an archive and show what restoring it would do. Destroys nothing."""
+    from ai_tutor.apps.dashboard import restore as restore_service
+
+    backup_id = request.POST.get('backup_id') or None
+    key = (request.POST.get('key') or '').strip()
+
+    backup = None
+    if backup_id:
+        backup = get_object_or_404(BackupJob, pk=backup_id,
+                                   status=BackupJob.Status.DONE)
+        key = backup.storage_key
+
+    if not (backup or key):
+        messages.error(request, "Choose an archive to restore.")
+        return redirect('dashboard:settings')
+
+    try:
+        report = restore_service.preflight(backup=backup, key=key)
+    except restore_service.PreflightFailed as exc:
+        messages.error(request, str(exc))
+        return redirect('dashboard:settings')
+
+    _log_restore_event(request, 'preflight', key=key, ok=report['ok'])
+
+    from ai_tutor.apps.accounts.models import PlatformConfig
+    config = PlatformConfig.load()
+    # The manifest stores an ISO string; the page should read like the rest of
+    # the dashboard, not like a log line.
+    taken_at = None
+    if report.get('created_at'):
+        try:
+            taken_at = datetime.fromisoformat(report['created_at'])
+        except ValueError:
+            pass
+    return render(request, 'dashboard/restore_confirm.html', {
+        'report': report,
+        'taken_at': taken_at,
+        'backup': backup,
+        'key': key,
+        'platform_name': config.platform_name or 'AI Tutor',
+        'token': _issue_confirm_token(
+            request, key=key, backup_id=backup.pk if backup else None),
+        # Shown rather than guessed at: a restore of a large archive is not
+        # quick and the platform is offline throughout.
+        'expect_offline_minutes': 40 if report.get('include_media') else 10,
+    })
+
+
+@superuser_required
+@require_POST
+def restore_start(request):
+    """Begin the restore. This is the point of no return."""
+    from ai_tutor.apps.dashboard import restore as restore_service
+
+    held = _spend_confirm_token(request, request.POST.get('token', ''))
+    if not held:
+        messages.error(
+            request,
+            "That confirmation has expired or was already used. Check the "
+            "archive again — nothing has been changed.")
+        return redirect('dashboard:settings')
+
+    from ai_tutor.apps.accounts.models import PlatformConfig
+    expected = (PlatformConfig.load().platform_name or 'AI Tutor').strip()
+    if (request.POST.get('confirm_name') or '').strip() != expected:
+        messages.error(request, "The platform name did not match. Nothing has "
+                                "been changed.")
+        return redirect('dashboard:settings')
+
+    restore_service.reap_stale()
+
+    backup = (BackupJob.objects.filter(pk=held['backup_id']).first()
+              if held['backup_id'] else None)
+    try:
+        report = restore_service.preflight(backup=backup, key=held['key'])
+    except restore_service.PreflightFailed as exc:
+        messages.error(request, str(exc))
+        return redirect('dashboard:settings')
+
+    # Re-checked here, not just on the confirmation page. The page was rendered
+    # minutes ago and this is the last moment before something irreversible.
+    if not report['ok']:
+        messages.error(request, "This archive cannot be restored: "
+                                + " ".join(report['blocking']))
+        return redirect('dashboard:settings')
+
+    try:
+        job = RestoreJob.objects.create(
+            created_by=request.user,
+            source=(RestoreJob.Source.ARCHIVE if backup
+                    else RestoreJob.Source.UPLOAD),
+            source_backup=backup,
+            source_key=held['key'],
+            include_media=report['include_media'],
+            manifest={},
+            preflight=report,
+        )
+    except IntegrityError:
+        messages.info(request, "A restore is already running.")
+        return redirect('dashboard:settings')
+
+    _log_restore_event(request, 'start', key=held['key'], job_id=job.pk)
+
+    try:
+        job.task_arn = restore_service.dispatch(job)
+        job.save(update_fields=['task_arn'])
+    except Exception as exc:                           # noqa: BLE001
+        job.status = RestoreJob.Status.FAILED
+        job.error = f'could not start the restore task: {exc}'
+        job.finished_at = timezone.now()
+        job.save(update_fields=['status', 'error', 'finished_at'])
+        messages.error(request, f"The restore could not be started: {exc}. "
+                                f"Nothing has been changed.")
+        return redirect('dashboard:settings')
+
+    # Handed over BEFORE the platform goes down, because the page that would
+    # normally show progress is about to stop being served.
+    watch_url = restore_service.status_presigned_url(job)
+    if watch_url:
+        request.session['restore_watch_url'] = watch_url
+    messages.success(
+        request,
+        "Restore started. The platform will go offline shortly and come back "
+        "on its own. You will be signed out — the restored database has the "
+        "sessions and passwords from when the archive was taken.")
+    return redirect('dashboard:settings')
+
+
+@superuser_required
+def restore_status(request):
+    """Poll target. Reads the status object, not the database.
+
+    Deliberately not a database query: for most of a restore the database is
+    being replaced, and this is the endpoint that still has something true to
+    say while that is happening.
+    """
+    from ai_tutor.apps.dashboard import restore as restore_service
+
+    job = RestoreJob.objects.order_by('-created_at').first()
+    if not job:
+        return JsonResponse({'job': None})
+
+    status = restore_service.read_status(job) or {}
+    return JsonResponse({
+        'job': {
+            'id': job.pk,
+            'status': status.get('state') or job.status,
+            'stage': status.get('stage') or job.stage,
+            'progress': status.get('progress') or job.progress,
+            'error': status.get('error') or job.error,
+            'safety_backup_key': (status.get('safety_backup_key')
+                                  or job.safety_backup_key),
+            'rds_snapshot_id': status.get('rds_snapshot_id') or job.rds_snapshot_id,
+            'created_at': job.created_at.isoformat(),
+            'created_by': getattr(job.created_by, 'username', ''),
+        },
+        'watch_url': request.session.get('restore_watch_url', ''),
+    })
+
+
+@superuser_required
+@require_POST
+def restore_upload(request):
+    """Accept a database-only archive from somewhere else.
+
+    With a bucket configured the browser uploads straight to S3 and this only
+    hands back the signed form: 500 MB cannot cross gunicorn inside the 120s
+    both it and the ALB allow, and TemporaryFileUploadHandler would spill the
+    whole body onto the task's disk before this function even ran. The
+    content-length-range condition is enforced by S3 rather than by a check
+    here, which is the only place it cannot be bypassed.
+
+    Without a bucket (dev, Docker without S3) the file comes through the
+    request, because there is nowhere else for it to go.
+    """
+    from django.conf import settings as django_settings
+    from django.template.defaultfilters import filesizeformat
+
+    from ai_tutor.apps.dashboard import backup as backup_service
+    from ai_tutor.apps.dashboard import restore as restore_service
+
+    bucket = backup_service.backup_bucket()
+    key = f'{restore_service.RESTORE_PREFIX}/{uuid.uuid4().hex}.tar.gz'
+
+    if bucket:
+        import boto3
+        client = boto3.client('s3', region_name=getattr(django_settings, 'AWS_REGION', None)
+                              or getattr(django_settings, 'AWS_MEDIA_REGION', None))
+        signed = client.generate_presigned_post(
+            Bucket=bucket, Key=key,
+            Fields={'x-amz-server-side-encryption': 'AES256'},
+            Conditions=[
+                {'x-amz-server-side-encryption': 'AES256'},
+                ['content-length-range', 1, MAX_UPLOAD_BYTES],
+            ],
+            ExpiresIn=3600,
+        )
+        _log_restore_event(request, 'upload_signed', key=key)
+        return JsonResponse({'direct': True, 'key': key,
+                             'url': signed['url'], 'fields': signed['fields']})
+
+    upload = request.FILES.get('archive')
+    if not upload:
+        messages.error(request, "Choose a .tar.gz archive to upload.")
+        return redirect('dashboard:settings')
+    if upload.size > MAX_UPLOAD_BYTES:
+        messages.error(
+            request,
+            f"That archive is {filesizeformat(upload.size)}. Uploads are capped "
+            f"at {filesizeformat(MAX_UPLOAD_BYTES)} — a full archive including "
+            f"media is restored by selecting it from the list instead.")
+        return redirect('dashboard:settings')
+
+    destination = backup_service.backup_root() / 'uploads'
+    destination.mkdir(parents=True, exist_ok=True)
+    path = destination / f'{uuid.uuid4().hex}.tar.gz'
+    written = 0
+    with path.open('wb') as out:
+        for chunk in upload.chunks():
+            written += len(chunk)
+            if written > MAX_UPLOAD_BYTES:
+                # Content-Length can lie; the bytes cannot.
+                out.close()
+                path.unlink(missing_ok=True)
+                messages.error(request, "That archive is larger than it claimed.")
+                return redirect('dashboard:settings')
+            out.write(chunk)
+
+    _log_restore_event(request, 'upload', key=str(path), bytes=written)
+    request.session['restore_uploaded_key'] = str(path)
+    messages.success(request, "Archive uploaded. Check it before restoring.")
+    return redirect('dashboard:settings')

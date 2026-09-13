@@ -143,6 +143,15 @@ urlpatterns = [
     path('settings/backup/status/', views.backup_status, name='backup_status'),
     path('settings/backup/<int:job_id>/download/', views.backup_download, name='backup_download'),
 
+    # Platform restore (superUSER only, not merely staff — see the decorator).
+    # Preflight is separate from start because the confirmation page is where
+    # the consequences are shown, and it must be reachable without committing
+    # to them.
+    path('settings/restore/preflight/', views.restore_preflight, name='restore_preflight'),
+    path('settings/restore/start/', views.restore_start, name='restore_start'),
+    path('settings/restore/status/', views.restore_status, name='restore_status'),
+    path('settings/restore/upload/', views.restore_upload, name='restore_upload'),
+
     # Safety / Flagged sessions
     path('flagged/', views.flagged_sessions, name='flagged_sessions'),
     path('flagged/<int:session_id>/', views.flagged_session_detail, name='flagged_session_detail'),

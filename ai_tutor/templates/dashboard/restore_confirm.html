@@ -1,0 +1,174 @@
+{% extends "dashboard/base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Restore from backup" %}{% endblock %}
+{% block page_title %}{% trans "Restore from backup" %}{% endblock %}
+
+{# This page exists because a confirm() dialog cannot show a row-count diff.   #}
+{# The decision being asked for is "destroy everything currently here and put  #}
+{# this instead", and the only way that decision is a real one is if the       #}
+{# consequences are on the screen while it is made.                            #}
+
+{% block content %}
+<div style="max-width: 760px;">
+
+  <div class="card" style="border:2px solid #b91c1c;margin-bottom:1.5rem;">
+    <div class="card-header" style="background:#fef2f2;">
+      <h3 class="card-title" style="color:#991b1b;">
+        {% trans "This replaces the whole platform" %}
+      </h3>
+    </div>
+    <div class="card-body">
+
+      <p style="font-size:0.9rem;margin-bottom:1rem;">
+        {% blocktrans trimmed with when=taken_at|date:"j F Y, H:i"|default:"an unrecorded time" %}
+          You are about to replace every record on this platform with the
+          contents of an archive taken at {{ when }}. Anything created since
+          then is destroyed.
+        {% endblocktrans %}
+      </p>
+
+      <ul style="font-size:0.875rem;color:var(--gray-600);margin:0 0 1.25rem 1.1rem;">
+        <li>{% blocktrans trimmed with mins=expect_offline_minutes %}
+          The platform goes offline for roughly {{ mins }} minutes. Students and
+          teachers will see an error page, not a maintenance message.
+        {% endblocktrans %}</li>
+        <li>{% blocktrans trimmed %}
+          You will be signed out. The restored database carries the sessions and
+          passwords from when the archive was taken — if your password has
+          changed since, the old one is the one that will work.
+        {% endblocktrans %}</li>
+        <li>{% blocktrans trimmed %}
+          A copy of the current data is taken first, automatically, and appears
+          in the backup list afterwards. It is how this is undone.
+        {% endblocktrans %}</li>
+      </ul>
+
+      {# ── The checks ── #}
+      <h4 style="font-size:0.8rem;text-transform:uppercase;letter-spacing:0.04em;
+                 color:var(--gray-500);margin-bottom:0.5rem;">
+        {% trans "Checks" %}
+      </h4>
+      <table class="table" style="width:100%;font-size:0.85rem;margin-bottom:1.25rem;">
+        <tbody>
+        {% for check in report.checks %}
+          <tr>
+            <td style="width:9rem;white-space:nowrap;vertical-align:top;">
+              {% if check.status == 'pass' %}
+                <span style="color:#15803d;">✓ {% trans "OK" %}</span>
+              {% elif check.status == 'warn' %}
+                <span style="color:#b45309;">! {% trans "Warning" %}</span>
+              {% elif check.status == 'unknown' %}
+                {# Never shown as a pass. An archive that could not be checked #}
+                {# has not been verified, and saying otherwise is how someone  #}
+                {# comes to trust a truncated file.                           #}
+                <span style="color:var(--gray-500);">? {% trans "Unverified" %}</span>
+              {% else %}
+                <span style="color:#b91c1c;">✕ {% trans "Blocked" %}</span>
+              {% endif %}
+            </td>
+            <td style="vertical-align:top;">
+              <strong>{{ check.name }}</strong><br>
+              <span style="color:var(--gray-600);">{{ check.detail }}</span>
+            </td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+
+      <p style="font-size:0.8rem;color:var(--gray-500);margin-bottom:1.25rem;">
+        {% blocktrans trimmed with src=report.manifest_source %}
+          Read from the {{ src }}.
+        {% endblocktrans %}
+      </p>
+
+      {# ── What would change ── #}
+      <h4 style="font-size:0.8rem;text-transform:uppercase;letter-spacing:0.04em;
+                 color:var(--gray-500);margin-bottom:0.5rem;">
+        {% trans "What would change" %}
+      </h4>
+      {% if report.row_diff %}
+      <div style="max-height:18rem;overflow:auto;border:1px solid var(--gray-200);
+                  border-radius:6px;margin-bottom:0.5rem;">
+        <table class="table" style="width:100%;font-size:0.82rem;margin:0;">
+          <thead>
+            <tr>
+              <th>{% trans "Table" %}</th>
+              <th style="text-align:right;">{% trans "Now" %}</th>
+              <th style="text-align:right;">{% trans "After" %}</th>
+              <th style="text-align:right;">{% trans "Change" %}</th>
+            </tr>
+          </thead>
+          <tbody>
+          {% for row in report.row_diff %}
+            {% if row.delta %}
+            <tr>
+              <td>{{ row.table }}</td>
+              <td style="text-align:right;">{{ row.live|default:"—" }}</td>
+              <td style="text-align:right;">{{ row.archive|default:"—" }}</td>
+              <td style="text-align:right;{% if row.delta < 0 %}color:#b91c1c;font-weight:600;{% endif %}">
+                {% if row.delta > 0 %}+{% endif %}{{ row.delta }}
+              </td>
+            </tr>
+            {% endif %}
+          {% empty %}
+            <tr><td colspan="4" style="color:var(--gray-500);">
+              {% trans "No differences recorded." %}</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <p style="font-size:0.78rem;color:var(--gray-500);margin-bottom:1.25rem;">
+        {% blocktrans trimmed %}
+          Only tables that change are listed. The archive's counts were taken as
+          the backup started, so they are a sanity check rather than an exact
+          figure — the checksum above is what proves the contents.
+        {% endblocktrans %}
+      </p>
+      {% endif %}
+
+      {# ── The decision ── #}
+      {% if report.ok %}
+      <form method="post" action="{% url 'dashboard:restore_start' %}"
+            style="border-top:1px solid var(--gray-200);padding-top:1.25rem;">
+        {% csrf_token %}
+        <input type="hidden" name="token" value="{{ token }}">
+
+        <label style="display:block;font-size:0.875rem;margin-bottom:0.5rem;">
+          {% blocktrans trimmed with name=platform_name %}
+            Type <strong>{{ name }}</strong> to confirm.
+          {% endblocktrans %}
+        </label>
+        <input type="text" name="confirm_name" autocomplete="off" required
+               placeholder="{{ platform_name }}"
+               style="width:100%;max-width:22rem;padding:0.5rem 0.75rem;
+                      border:1px solid var(--gray-300);border-radius:6px;
+                      margin-bottom:1rem;">
+
+        <div>
+          <button type="submit"
+                  style="background:#b91c1c;color:#fff;border:none;
+                         padding:0.6rem 1.1rem;border-radius:6px;font-weight:600;
+                         cursor:pointer;">
+            {% trans "Restore, and destroy current data" %}
+          </button>
+          <a href="{% url 'dashboard:settings' %}" class="btn btn-secondary"
+             style="margin-left:0.75rem;">{% trans "Cancel" %}</a>
+        </div>
+      </form>
+      {% else %}
+      <div style="border-top:1px solid var(--gray-200);padding-top:1.25rem;">
+        <p style="background:#fef2f2;border:1px solid #fca5a5;color:#991b1b;
+                  border-radius:8px;padding:0.75rem 1rem;font-size:0.875rem;">
+          <strong>{% trans "This archive cannot be restored." %}</strong><br>
+          {% for reason in report.blocking %}{{ reason }}<br>{% endfor %}
+        </p>
+        <a href="{% url 'dashboard:settings' %}" class="btn btn-secondary">
+          {% trans "Back to settings" %}</a>
+      </div>
+      {% endif %}
+
+    </div>
+  </div>
+</div>
+{% endblock %}
