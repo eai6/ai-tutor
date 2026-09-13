@@ -1,8 +1,13 @@
-"""Backfill Course.subject_code and Course.grade_levels from legacy fields.
+"""Backfill Course.subject_code and Course.subject_type from the title.
 
-Maps `Course.title` → SubjectCode by keyword, and parses
-`Course.grade_level` (free-text CharField, possibly comma-separated) into
-the normalised `grade_levels` JSONField list.
+Maps `Course.title` → SubjectCode by keyword, then `subject_code` →
+`subject_type`, for courses created before the upload form collected either.
+
+Grade is no longer part of this. `Course.grade_levels` is a property over
+`Course.grade_level`, so there is nothing to keep in step — see step 3 of
+`memory/subject_grade_unification_plan.md`. Grade tokens are still parsed,
+but only to decide whether a course with no inferable subject is worth
+reporting as unmapped.
 
 Usage:
     python manage.py backfill_course_subjects --dry-run
@@ -86,7 +91,7 @@ def parse_grade_levels(grade_level: str) -> List[str]:
 
 
 class Command(BaseCommand):
-    help = "Backfill Course.subject_code + Course.grade_levels from legacy fields."
+    help = "Backfill Course.subject_code + Course.subject_type from the title."
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -99,7 +104,7 @@ class Command(BaseCommand):
         )
         parser.add_argument(
             '--overwrite', action='store_true', default=False,
-            help="Overwrite existing subject_code/grade_levels if already set. "
+            help="Overwrite existing subject_code/subject_type if already set. "
                  "Default: only fill empty fields.",
         )
 
@@ -153,11 +158,10 @@ class Command(BaseCommand):
                         if apply_changes:
                             c.subject_type = proposed_type
 
-                if proposed_grades and (overwrite or not c.grade_levels):
-                    if c.grade_levels != proposed_grades:
-                        changes.append(f"grade_levels: {c.grade_levels!r} → {proposed_grades!r}")
-                        if apply_changes:
-                            c.grade_levels = proposed_grades
+                # No grade branch any more. grade_levels is derived from
+                # grade_level, and proposed_grades came from parsing that same
+                # field — so it could only ever propose what the property
+                # already returns. There is nothing left to keep in step.
 
                 if changes:
                     will_update += 1
@@ -167,9 +171,7 @@ class Command(BaseCommand):
                         + "\n".join(f"        {ch}" for ch in changes) + "\n"
                     )
                     if apply_changes:
-                        c.save(update_fields=[
-                            'subject_code', 'subject_type', 'grade_levels',
-                        ])
+                        c.save(update_fields=['subject_code', 'subject_type'])
                 elif not c.subject_code and not c.grade_levels:
                     # Nothing to write but also nothing was set — log
                     inst = c.institution.name if c.institution else 'PLATFORM-WIDE'

@@ -11,19 +11,22 @@ from ai_tutor.apps.tutoring.cli.session import BootstrapError, subject_filter
 
 
 class SubjectFilterTest(SimpleTestCase):
-    """The filter must match subject_code OR subject_type.
+    """The filter reads subject_code, and only subject_code.
 
-    Courses in this database are classified through different fields —
-    Mathematics S3 has subject_type='math' with subject_code empty, Mount Fleuri
-    Geography S3 has subject_code='geography' with subject_type empty. A filter
-    checking only one field returns nothing for half the catalogue, and the
-    failure looks like "no lessons found" rather than a bug.
+    It used to match subject_code OR subject_type, because courses were
+    classified through whichever field the code path that created them happened
+    to write — so checking one field returned nothing for half the catalogue.
+    Migration 0036 gave those courses their code, and subject_type is on its way
+    out entirely (step 4 of memory/subject_grade_unification_plan.md).
+
+    subject_type also cannot answer the question the filter is asked: geography
+    and history both collapse to 'humanities'.
     """
 
-    def test_math_matches_both_classification_fields(self):
+    def test_math_reads_the_subject_code_alone(self):
         children = str(subject_filter('math'))
-        self.assertIn('subject_code', children)
-        self.assertIn('subject_type', children)
+        self.assertIn('mathematics', children)
+        self.assertNotIn('subject_type', children)
 
     def test_geography_matches_subject_code(self):
         self.assertIn('geography', str(subject_filter('geography')))

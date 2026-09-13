@@ -1432,9 +1432,9 @@ def complete_curriculum_upload(upload_id: int, feedback: str = "") -> Dict:
             }
             if getattr(upload, 'subject_code', '') and upload.subject_code:
                 course_defaults['subject_code'] = upload.subject_code
-            # `grade` here is already canonical ('S1'..'S6'); wrap into the list field.
-            if grade:
-                course_defaults['grade_levels'] = [grade]
+            # grade_levels is derived from grade_level now, so setting
+            # grade_level (above) is the whole job — there is no list to keep
+            # in step with it any more.
 
             # Additive merge (2026-06): get_or_create, never update_or_create.
             # A re-parse must not overwrite an existing course's meta or its
@@ -1448,7 +1448,7 @@ def complete_curriculum_upload(upload_id: int, feedback: str = "") -> Dict:
 
             # `defaults` only fire on CREATE. Every re-upload, and every course
             # that predates the subject dropdown, therefore kept blank
-            # subject_code / grade_levels forever — and those two fields are
+            # subject_code / grade_level forever — and those two fields are
             # the entire join for material sharing. The teacher picks a subject
             # and a grade on the upload form, the upload row stores them, and
             # the course they belong to never sees them; inheritance then
@@ -1460,8 +1460,8 @@ def complete_curriculum_upload(upload_id: int, feedback: str = "") -> Dict:
                 fill = {}
                 if not course.subject_code and course_defaults.get('subject_code'):
                     fill['subject_code'] = course_defaults['subject_code']
-                if not course.grade_levels and course_defaults.get('grade_levels'):
-                    fill['grade_levels'] = course_defaults['grade_levels']
+                if not course.grade_level and course_defaults.get('grade_level'):
+                    fill['grade_level'] = course_defaults['grade_level']
                 if fill:
                     for field, value in fill.items():
                         setattr(course, field, value)

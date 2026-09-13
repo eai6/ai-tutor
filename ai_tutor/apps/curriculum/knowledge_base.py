@@ -1504,7 +1504,7 @@ class CurriculumKnowledgeBase:
         global_courses = CourseModel.objects.filter(
             institution__isnull=True,
             subject_code=subject_code,
-        ).only('id', 'grade_levels')
+        ).only('id', 'grade_level')
 
         # Filter by grade_level overlap (any-of). When the school course
         # has no grade_levels set, accept all global courses with the

@@ -240,9 +240,9 @@
                         <small style="color:var(--gray-500);font-size:0.7rem;">Tick all years this course covers. Used to match platform-wide courses for material inheritance.</small>
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Grade label (display)</label>
-                        <input type="text" name="grade_level" class="form-control" value="{{ course.grade_level }}" placeholder="auto from grade levels">
-                        <small style="color:var(--gray-500);font-size:0.7rem;">Optional free-text label. Auto-derived from grade levels if blank.</small>
+                        <label class="form-label">Grade (free text)</label>
+                        <input type="text" name="grade_level" class="form-control" value="{{ course.grade_level }}" placeholder="only if no year is ticked">
+                        <small style="color:var(--gray-500);font-size:0.7rem;">Used only when no year is ticked above — for a course whose grade isn't in this platform's list. Ticking a year overwrites this.</small>
                     </div>
                     <div class="form-group" style="grid-column: 1 / -1;">
                         <label class="form-label">Description</label>

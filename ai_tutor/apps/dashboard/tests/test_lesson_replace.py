@@ -222,29 +222,31 @@ class TestSubjectAndGradeReachTheCourse:
     def test_a_blank_course_is_filled_in(self, db, school):
         from ai_tutor.apps.curriculum.models import Course as C
         course = C.objects.create(title='Mathematics S3', institution=school,
-                                  subject_code='', grade_levels=[])
+                                  subject_code='', grade_level='')
         upload = self._upload(school)
 
         # What the pipeline does for an existing course.
-        defaults = {'subject_code': upload.subject_code, 'grade_levels': ['S3']}
+        defaults = {'subject_code': upload.subject_code, 'grade_level': 'S3'}
         fill = {}
         if not course.subject_code and defaults.get('subject_code'):
             fill['subject_code'] = defaults['subject_code']
-        if not course.grade_levels and defaults.get('grade_levels'):
-            fill['grade_levels'] = defaults['grade_levels']
+        if not course.grade_level and defaults.get('grade_level'):
+            fill['grade_level'] = defaults['grade_level']
         for f, v in fill.items():
             setattr(course, f, v)
         course.save(update_fields=list(fill))
 
         course.refresh_from_db()
         assert course.subject_code == 'mathematics'
+        # grade_levels is a property over grade_level — filling the one text
+        # field is the whole job, and the list the material join reads follows.
         assert course.grade_levels == ['S3']
 
     def test_a_course_with_neither_is_flagged_on_the_page(self, client, teacher,
                                                           db, school):
         from ai_tutor.apps.curriculum.models import Course as C
         course = C.objects.create(title='Mathematics S3', institution=school,
-                                  subject_code='', grade_levels=[])
+                                  subject_code='', grade_level='')
         client.force_login(teacher)
         body = client.get(reverse('dashboard:course_detail',
                                   args=[course.id])).content.decode()
@@ -253,8 +255,8 @@ class TestSubjectAndGradeReachTheCourse:
 
     def test_a_course_with_both_is_not_flagged(self, client, teacher, course):
         course.subject_code = 'geography'
-        course.grade_levels = ['S3']
-        course.save(update_fields=['subject_code', 'grade_levels'])
+        course.grade_level = 'S3'
+        course.save(update_fields=['subject_code', 'grade_level'])
 
         client.force_login(teacher)
         body = client.get(reverse('dashboard:course_detail',

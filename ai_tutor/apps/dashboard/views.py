@@ -193,7 +193,7 @@ def _inherited_materials_summary(course):
     platform_courses = list(CourseModel.objects.filter(
         institution__isnull=True,
         subject_code=course.subject_code,
-    ).only('id', 'title', 'grade_levels'))
+    ).only('id', 'title', 'grade_level'))
 
     matching = []
     for pc in platform_courses:
@@ -8057,8 +8057,10 @@ def course_edit(request, course_id):
     valid_years = {c[0].strip() for c in PlatformConfig.get_grade_choices()}
     grade_levels = sorted({g.strip() for g in grade_levels_raw if g.strip() in valid_years})
 
-    # Auto-derive grade_level (CharField) from grade_levels list when blank
-    if not grade_level and grade_levels:
+    # The ticked years ARE the grade. grade_levels is derived from this text
+    # now, so the checkboxes write it and the free-text box is only a manual
+    # override for a course whose grades are not in the configured set.
+    if grade_levels:
         grade_level = ",".join(grade_levels)
 
     course.title = title
@@ -8072,9 +8074,6 @@ def course_edit(request, course_id):
     if subject_code or 'subject_code' in request.POST:
         course.subject_code = subject_code
         update_fields.append('subject_code')
-    if grade_levels or 'grade_levels' in request.POST:
-        course.grade_levels = grade_levels
-        update_fields.append('grade_levels')
     if images_enabled_posted:
         course.tutoring_images_enabled = tutoring_images_enabled
         update_fields.append('tutoring_images_enabled')

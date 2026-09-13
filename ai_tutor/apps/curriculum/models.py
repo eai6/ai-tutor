@@ -130,14 +130,14 @@ class Course(models.Model):
         S5 = 'S5', 'S5'
         S6 = 'S6', 'S6'
 
-    grade_levels = models.JSONField(
+    # Superseded by the `grade_levels` PROPERTY below. Nothing reads or writes
+    # this column any more; it is kept for one release so a rollback still has
+    # the data, and dropped after that. Do not add references.
+    grade_levels_stored = models.JSONField(
+        db_column='grade_levels',
         default=list,
         blank=True,
-        help_text=(
-            "Normalised list of secondary years (e.g. ['S3'] or "
-            "['S1','S2','S3','S4','S5']). Used for material-sharing "
-            "matches between school and platform-wide courses."
-        ),
+        help_text="Deprecated — read Course.grade_levels, which parses grade_level.",
     )
 
     # Teacher policy: if False, students cannot pick their session
@@ -200,6 +200,26 @@ class Course(models.Model):
         'percentage', 'percentages',
         'probability', 'statistics',
     )
+
+    @property
+    def grade_levels(self):
+        """The years this course covers, parsed from ``grade_level``.
+
+        Was a stored JSONField kept alongside the text, and the two drifted:
+        Mathematics S3 held grade_level='S3' with grade_levels=[], so material
+        sharing — which joins on this list — matched nothing for it while the
+        page displayed S3 everywhere. 7 of 8 courses agreed; the one that did
+        not is the one that reported the bug.
+
+        Deriving it removes the class of bug rather than the instance. There is
+        no second value to fill in, keep in step, or backfill.
+
+        Splitting on commas with no S-prefix assumption: grade codes are
+        country-specific and configured (Seychelles 'S1'-'S5', Mozambique
+        '8ª Classe'-'12ª Classe'). Anything unparseable yields [], which is
+        today's no-match behaviour rather than a guess.
+        """
+        return [g.strip() for g in (self.grade_level or '').split(',') if g.strip()]
 
     @property
     def is_math(self):
