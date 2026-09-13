@@ -394,3 +394,135 @@ class TestItIsOnTheRecord:
         logged = SafetyAuditLog.objects.filter(
             event_type=SafetyAuditLog.EventType.DATA_EXPORT).first()
         assert logged.user_id == superadmin.id
+
+
+@pytest.mark.django_db(transaction=True)
+class TestTheArchiveCanBeCheckedBeforeItIsTrusted:
+    """What a restore needs to know before it drops the live database.
+
+    An archive that cannot be verified is one you find out about at the worst
+    possible moment. These are the fields that make "is this file good, and does
+    its schema match this code?" answerable without restoring it to find out.
+    """
+
+    def _build(self):
+        job = BackupJob.objects.create()
+        backup_service.build(job)
+        job.refresh_from_db()
+        assert job.status == BackupJob.Status.DONE, job.error
+        return job
+
+    def test_the_dump_checksum_is_of_the_dump(self, local_backup,
+                                              student_with_transcript, tmp_path):
+        """Not of the archive, and not a stand-in for the row counts."""
+        import hashlib
+        job = self._build()
+        recorded = job.summary['database']['dump_sha256']
+
+        with tarfile.open(job.storage_key) as tar:
+            name = job.summary['database']['dump_file']
+            actual = hashlib.sha256(tar.extractfile(name).read()).hexdigest()
+        assert actual == recorded
+
+    def test_a_tampered_archive_stops_matching_its_checksum(self, local_backup,
+                                                           student_with_transcript):
+        """The whole point: a truncated or altered copy is detectable."""
+        import hashlib
+        job = self._build()
+        path = Path(job.storage_key)
+        assert hashlib.sha256(path.read_bytes()).hexdigest() == job.archive_sha256
+
+        path.write_bytes(path.read_bytes()[:-2048])
+        assert hashlib.sha256(path.read_bytes()).hexdigest() != job.archive_sha256
+
+    def test_the_manifest_records_which_migrations_were_applied(
+            self, local_backup, student_with_transcript):
+        """The schema version. `app_version` cannot answer this — VERSION is a
+        constant that has never been bumped."""
+        from django.db import connection
+        job = self._build()
+        heads = job.summary['database']['migration_heads']
+
+        with connection.cursor() as cur:
+            cur.execute("SELECT app, MAX(name) FROM django_migrations GROUP BY app")
+            expected = {app: name for app, name in cur.fetchall()}
+        assert heads == expected
+        assert 'dashboard' in heads
+
+    def test_the_manifest_is_readable_without_opening_the_archive(
+            self, local_backup, student_with_transcript):
+        """job.summary IS the manifest. This is what lets the settings page
+        preflight a 9.3 GB archive for the cost of a database read."""
+        job = self._build()
+        with tarfile.open(job.storage_key) as tar:
+            inside = json.loads(tar.extractfile('manifest.json').read())
+
+        for field in ('scope', 'database', 'media', 'restore'):
+            assert job.summary[field] == inside[field]
+        assert job.summary['scope'] == 'platform'
+
+    def test_a_sidecar_manifest_sits_beside_the_archive(self, local_backup,
+                                                       student_with_transcript):
+        """For the archive whose row is gone — uploaded from a laptop, or the
+        pre-restore safety copy whose row the restore itself destroys."""
+        job = self._build()
+        sidecar = Path(job.storage_key + '.manifest.json')
+        assert sidecar.is_file()
+
+        described = json.loads(sidecar.read_text())
+        assert described['scope'] == 'platform'
+        assert described['database']['dump_sha256'] == job.summary['database']['dump_sha256']
+        # The sidecar can carry the archive's own hash; the copy inside the tar
+        # cannot, because it is sealed before the hash exists.
+        assert described['archive_sha256'] == job.archive_sha256
+
+    def test_the_format_version_is_stamped(self, local_backup,
+                                           student_with_transcript):
+        """So a restore meeting an older archive says 'cannot verify' rather
+        than reading fields that are not there."""
+        job = self._build()
+        assert job.summary['archive_format_version'] == backup_service.ARCHIVE_FORMAT_VERSION
+        assert backup_service.ARCHIVE_FORMAT_VERSION >= 2
+
+    def test_row_counts_are_labelled_as_taken_before_the_dump(
+            self, local_backup, student_with_transcript):
+        """They are a sanity signal, not an integrity check, and the two must
+        not be presented as interchangeable."""
+        job = self._build()
+        assert job.summary['database']['row_counts_taken'] == 'at backup start'
+
+
+@pytest.mark.django_db(transaction=True)
+class TestCountingIsNotDoneOnEveryPageView:
+    """Listing 10,521 media objects to render two numbers, on every settings
+    page load, was the cost before this."""
+
+    def test_the_inventory_is_cached(self, local_backup):
+        from django.core.cache import cache
+        cache.delete(backup_service.INVENTORY_CACHE_KEY)
+
+        calls = []
+        original = backup_service._media_inventory
+
+        def counting():
+            calls.append(1)
+            return original()
+
+        backup_service._media_inventory = counting
+        try:
+            backup_service.inventory()
+            backup_service.inventory()
+            backup_service.inventory()
+            assert len(calls) == 1
+        finally:
+            backup_service._media_inventory = original
+
+    def test_a_backup_always_counts_afresh(self, local_backup):
+        """A 15-minute-old number is fine for the card and not for the manifest."""
+        from django.core.cache import cache
+        cache.set(backup_service.INVENTORY_CACHE_KEY,
+                  {'database': {'stale': True}, 'media': {'stale': True}}, 900)
+
+        counts = backup_service.inventory(fresh=True)
+        assert 'stale' not in counts['database']
+        assert counts['database']['engine'] in ('sqlite', 'postgresql')

@@ -4005,8 +4005,10 @@ def settings_page(request):
         'personalities': personalities,
     }
 
-    # Platform backup. The inventory is two counting queries and a bucket
-    # listing, so it is built only for the account that can see the card.
+    # Platform backup. The inventory is a row count on every model in eight app
+    # labels plus a full bucket listing, so it is built only for the account
+    # that can see the card — and cached for 15 minutes, because this page is
+    # opened to change a setting far more often than to take a backup.
     if is_superadmin:
         from ai_tutor.apps.dashboard import backup as backup_service
         context['backup_jobs'] = BackupJob.objects.select_related('created_by')[:10]

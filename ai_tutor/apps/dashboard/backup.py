@@ -19,6 +19,7 @@ what the settings page polls.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import os
@@ -31,6 +32,7 @@ from datetime import timedelta
 from pathlib import Path
 
 from django.conf import settings
+from django.core.cache import cache
 from django.db import connection, connections
 from django.utils import timezone
 
@@ -44,6 +46,12 @@ OPS_PREFIX = 'backups'
 # How long a download link stays valid. Short: the link is the archive, and it
 # needs no credentials, so anyone it is forwarded to gets every student record.
 DOWNLOAD_URL_TTL_SECONDS = 15 * 60
+
+# Manifest shape. 1 was the original — no checksums, no migration heads, and
+# `app_version` standing in for a schema version it could not actually report.
+# Archives at version 1 are still restorable; a restore just cannot verify them,
+# and has to say so rather than imply a check it did not perform.
+ARCHIVE_FORMAT_VERSION = 2
 
 
 def backup_bucket() -> str:
@@ -95,11 +103,56 @@ def _media_inventory() -> dict:
     return {'store': 'local', 'files': count, 'bytes': total}
 
 
+def _migration_heads() -> dict:
+    """The last migration APPLIED per app, straight out of django_migrations.
+
+    This is the archive's schema version, and the only honest one available.
+    `VERSION` at the repo root has read 0.1.0 since May and is never bumped, so
+    `app_version` in the manifest answers "which code wrote this?" with a
+    constant.
+
+    Applied, not what the code ships: the question a restore has to answer is
+    "what shape is the data in this dump", and `MigrationLoader.graph` would
+    describe the shape of the code doing the reading instead. Sixteen rows, one
+    query.
+
+    A dump whose heads are AHEAD of the running code cannot be restored — there
+    is no migrating backwards — which is the check this field exists for.
+    """
+    try:
+        with connection.cursor() as cur:
+            cur.execute(
+                "SELECT app, MAX(name) FROM django_migrations GROUP BY app"
+            )
+            return {app: name for app, name in cur.fetchall()}
+    except Exception as exc:                           # noqa: BLE001 - reported, not raised
+        # Never fail a backup over its own metadata. A manifest without heads is
+        # a manifest preflight will say it cannot verify, which is the correct
+        # outcome and strictly better than no archive at all.
+        logger.warning('could not read migration heads: %s', exc)
+        return {}
+
+
+def _sha256(path: Path) -> str:
+    """Hash a file in chunks. The dump can be hundreds of MB; do not read it whole."""
+    digest = hashlib.sha256()
+    with path.open('rb') as fh:
+        for chunk in iter(lambda: fh.read(1024 * 1024), b''):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 def _database_inventory() -> dict:
     """Engine, and a row count for the tables that carry student data.
 
     The counts are what makes a restore checkable: a manifest saying 23 students
     and 1,412 turns is something you can compare against what came back.
+
+    They are taken BEFORE the dump, so on a large database they describe the
+    moment the backup started rather than the dump's exact contents. Good enough
+    to catch "this archive restored to a tenth of the rows"; not an integrity
+    check. That is what dump_sha256 is for, and the two are labelled differently
+    wherever they are shown.
     """
     engine = connection.vendor
     counts = {}
@@ -124,12 +177,42 @@ def _database_inventory() -> dict:
         path = Path(connection.settings_dict['NAME'])
         size = path.stat().st_size if path.exists() else 0
 
-    return {'engine': engine, 'bytes': size, 'row_counts': counts}
+    return {'engine': engine, 'bytes': size, 'row_counts': counts,
+            'migration_heads': _migration_heads()}
 
 
-def inventory() -> dict:
-    """What the settings page shows before anyone presses the button."""
-    return {'database': _database_inventory(), 'media': _media_inventory()}
+INVENTORY_CACHE_KEY = 'dashboard:backup:inventory'
+INVENTORY_CACHE_SECONDS = 15 * 60
+
+
+def inventory(*, fresh: bool = False) -> dict:
+    """What the settings page shows before anyone presses the button.
+
+    Cached, because this is not cheap and the settings page called it on every
+    render: a row count on every model in eight app labels, plus — with S3 media
+    — a full paginated `list_objects_v2` over the whole bucket, which is eleven
+    round-trips for 10,521 objects. All to show two numbers that change slowly.
+
+    Pass fresh=True from build(), where the numbers go into the manifest and a
+    15-minute-old count is not good enough.
+
+    Note the cache is per-process: CACHES is unconfigured, so this is Django's
+    LocMemCache and each gunicorn worker keeps its own copy. That turns "one
+    bucket listing per page view" into "one per worker per 15 minutes", which is
+    the whole of the win here. A shared cache would be better and is not needed.
+    """
+    if not fresh:
+        cached = cache.get(INVENTORY_CACHE_KEY)
+        if cached is not None:
+            return cached
+
+    # A datetime, not a string: the template renders it as "4 minutes ago",
+    # which is what someone reading it wants to know. Nothing puts this in the
+    # manifest, so it never needs to be JSON.
+    data = {'database': _database_inventory(), 'media': _media_inventory(),
+            'measured_at': timezone.now()}
+    cache.set(INVENTORY_CACHE_KEY, data, INVENTORY_CACHE_SECONDS)
+    return data
 
 
 # ---------------------------------------------------------------------------
@@ -251,21 +334,42 @@ def _touch(job, *, stage: str | None = None, progress: int | None = None):
         job.save(update_fields=fields)
 
 
-def _store(job, archive: Path) -> str:
-    """Put the finished archive where the download view will look for it."""
+def _store(job, archive: Path, manifest: dict, *, prefix: str = OPS_PREFIX) -> str:
+    """Put the finished archive where the download view will look for it.
+
+    Writes a `<key>.manifest.json` sidecar beside it. The manifest is already on
+    job.summary, which is how the settings page reads it for nothing — but an
+    archive can outlive its row. It is downloaded to a laptop and uploaded back
+    months later; the pre-restore safety copy has its row dropped by the very
+    restore that took it. The sidecar is how such an archive still says what it
+    contains without reading gigabytes to find the copy inside the tar.
+
+    The in-tar manifest stays exactly where it is. Someone handed this file years
+    from now, with no bucket and no database, should still be able to open it and
+    find out what it holds.
+
+    `prefix` exists for the restore's safety copy, which lands under
+    backups/pre-restore/<id>/ so it is not one undated row among the ordinary
+    backups at the moment somebody badly needs to find it.
+    """
     name = archive.name
     bucket = backup_bucket()
+    blob = json.dumps(manifest, indent=2, default=str).encode()
     if bucket:
         import boto3
         client = boto3.client('s3', region_name=getattr(settings, 'AWS_REGION', None)
                               or getattr(settings, 'AWS_MEDIA_REGION', None))
-        key = f'{OPS_PREFIX}/{name}'
+        key = f'{prefix}/{name}'
         client.upload_file(str(archive), bucket, key,
                            ExtraArgs={'ServerSideEncryption': 'AES256'})
+        client.put_object(Bucket=bucket, Key=f'{key}.manifest.json', Body=blob,
+                          ContentType='application/json',
+                          ServerSideEncryption='AES256')
         return key
 
     destination = backup_root() / name
     shutil.move(str(archive), destination)
+    destination.with_name(destination.name + '.manifest.json').write_bytes(blob)
     return str(destination)
 
 
@@ -284,7 +388,10 @@ def build(job) -> None:
     name = f'aitutor-backup-{stamp}-{kind}.tar.gz'
 
     try:
-        counts = inventory()
+        # fresh=True: these numbers go into the manifest and are what a restore
+        # is checked against. The page may show a 15-minute-old count; this
+        # cannot.
+        counts = inventory(fresh=True)
         _touch(job, stage='dumping database', progress=5)
 
         with tempfile.TemporaryDirectory() as scratch:
@@ -292,14 +399,27 @@ def build(job) -> None:
             dump_path = scratch_path / ('db.dump' if connection.vendor == 'postgresql'
                                         else 'db.sqlite3')
             dump_format = _dump_database(dump_path, job)
+            _touch(job, stage='checksumming', progress=20)
+            dump_sha256 = _sha256(dump_path)
             _touch(job, stage='writing archive', progress=25)
 
             manifest = {
+                # Bumped when the shape of this document changes. A restore that
+                # meets a version it does not know should say so rather than
+                # guess at fields that may not mean what it assumes.
+                'archive_format_version': ARCHIVE_FORMAT_VERSION,
                 'created_at': timezone.now().isoformat(),
                 'scope': 'platform',
                 'created_by': getattr(job.created_by, 'username', None),
                 'database': {**counts['database'], 'dump_format': dump_format,
-                             'dump_file': dump_path.name},
+                             'dump_file': dump_path.name,
+                             'dump_bytes': dump_path.stat().st_size,
+                             # The integrity check. row_counts is a sanity
+                             # signal taken before the dump ran; this is of the
+                             # dump itself. They are not interchangeable and the
+                             # UI must not present them as if they were.
+                             'dump_sha256': dump_sha256,
+                             'row_counts_taken': 'at backup start'},
                 'media': counts['media'],
                 'app_version': _app_version(),
                 'restore': _restore_instructions(dump_format, dump_path.name,
@@ -323,11 +443,18 @@ def build(job) -> None:
 
             _touch(job, stage='uploading', progress=92)
             size = archive_path.stat().st_size
-            key = _store(job, archive_path)
+            # Of the whole archive, so a restore can tell a truncated upload or
+            # a bit-rotted copy from a good one BEFORE it drops the live
+            # database. dump_sha256 above catches the same for the dump once
+            # the archive is open; this catches it one layer earlier.
+            archive_sha256 = _sha256(archive_path)
+            manifest['archive_sha256'] = archive_sha256
+            key = _store(job, archive_path, manifest)
 
         job.status = job.Status.DONE
         job.storage_key = key
         job.size_bytes = size
+        job.archive_sha256 = archive_sha256
         job.summary = manifest
         job.stage = 'done'
         job.progress = 100

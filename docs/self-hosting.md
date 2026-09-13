@@ -111,6 +111,7 @@ marked *yours* are the difference between this path and Path A.
 | **NAT Gateway** | Outbound-only internet for the private subnets. | The app calls LLM APIs and pulls container images. Nothing can dial *in*. |
 | **S3 — media** | Lesson images and figures. Private. | Served *through Django* at `/media/<path>`, never a bucket URL. |
 | **S3 — ops** | Database dumps during restores. Private, 7-day expiry. | Separate from media on purpose: media is served over the internet, dumps must never be. |
+| **S3 — backups** | Platform backups from Settings → Data backup. Private, **versioned**, 90-day expiry. | Its own bucket, not a prefix in ops: 7 days is right for a restore payload someone forgot to delete and wrong for the copy a ministry is told to keep. Versioned because a backup that a later broken one can silently replace is not a backup. |
 | **S3 — downloads** | Desktop installers. **Public.** | The only intentionally world-readable bucket. |
 | **Secrets Manager** | 6 secrets: DB URL, Django key, 4 LLM provider keys. | Injected at container start; never in the image or the repo. |
 | **ECR** | Container registry, keeps the last 20 images. | Rollback targets. |

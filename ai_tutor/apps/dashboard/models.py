@@ -480,10 +480,13 @@ class BackupJob(models.Model):
     when, how big, and whether it finished — and an entry that a cache eviction
     can delete cannot answer it.
 
-    The archive itself never lives here. It goes to the ops bucket, which has a
-    7-day expiry rule, so `storage_key` points at something that will be gone
-    before long. That is deliberate: a bucket accumulating copies of every
-    student record is a larger risk than a backup someone has to re-take.
+    The archive itself never lives here. It goes to a dedicated backups bucket —
+    versioned, encrypted, closed to the public, with a 90-day expiry
+    (infra/aws/components/storage.py) — so `storage_key` points at something
+    that will eventually be gone. That is deliberate: a bucket accumulating
+    copies of every student record indefinitely is a larger risk than a backup
+    someone has to re-take. Not the ops bucket, which expires after 7 days: right
+    for a restore payload, wrong for the copy a ministry is told to keep.
     """
 
     class Status(models.TextChoices):
@@ -515,9 +518,17 @@ class BackupJob(models.Model):
     progress = models.PositiveSmallIntegerField(default=0)
 
     # What went in, for the manifest and for the list view: row counts per
-    # table, media file count and bytes, database engine, app version.
+    # table, media file count and bytes, database engine, migration heads.
+    # This IS the manifest, copied verbatim — which is what lets a restore read
+    # what an archive contains without fetching a byte of it.
     summary = models.JSONField(default=dict, blank=True)
     error = models.TextField(blank=True)
+
+    # SHA-256 of the whole archive, so a restore can tell a truncated upload or
+    # a bit-rotted copy from a good one before it drops the live database.
+    # Blank on archives taken before this was recorded; preflight treats that as
+    # "cannot verify", never as "verified".
+    archive_sha256 = models.CharField(max_length=64, blank=True)
 
     # Always True; it exists only to give the partial unique index below
     # something to collide on. See the constraint.

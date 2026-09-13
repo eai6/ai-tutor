@@ -652,6 +652,17 @@
                     <strong>{{ backup_inventory.media.bytes|filesizeformat }}</strong>
                 </div>
             </div>
+            {# Counting these means a row count on every model plus listing  #}
+            {# the whole media bucket, so the figures are cached. Say they   #}
+            {# may be stale rather than present them as live.                #}
+            {% if backup_inventory.measured_at %}
+            <p style="color:var(--gray-500);font-size:0.8rem;margin:-0.75rem 0 1.25rem;">
+                {% blocktrans trimmed %}
+                    These figures are cached for up to 15 minutes. Taking a backup
+                    always counts afresh.
+                {% endblocktrans %}
+            </p>
+            {% endif %}
 
             {% if backup_is_ephemeral %}
             <p style="background:#fffbeb;border:1px solid #fcd34d;color:#92400e;
@@ -739,6 +750,11 @@
                     it. The link the button hands to your browser needs no sign-in, so
                     that link alone stops working after 15 minutes; pressing Download
                     again always issues a fresh one.
+                {% endblocktrans %}
+                {% blocktrans trimmed %}
+                    That link points at Amazon S3 rather than this site, so a school
+                    network that only allows this domain will block it. Download from
+                    a connection that does not.
                 {% endblocktrans %}
             </p>
         </div>
