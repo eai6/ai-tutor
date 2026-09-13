@@ -135,3 +135,73 @@ def test_unchecking_everything_detaches(client, teacher, course):
 
     course.refresh_from_db()
     assert list(course.shared_materials.all()) == []
+
+
+# ---------------------------------------------------------------------------
+# Which materials a course may attach. "Does it matter if it's for all schools
+# or just one school?" — yes, and the same-school case was wrongly refused.
+# ---------------------------------------------------------------------------
+
+def test_a_schools_own_material_is_attachable_to_its_own_course(
+        client, teacher, course, school):
+    """The common case, and the one that was missing. School A attaching
+    School A's material to School A's course crosses no boundary at all; it
+    was refused for a leak that cannot happen."""
+    ours = _material(institution=school, title='Belonie Worksheets')
+
+    _attach(client, teacher, course, [ours.id])
+
+    course.refresh_from_db()
+    assert [m.id for m in course.shared_materials.all()] == [ours.id]
+
+
+def test_it_is_offered_in_the_picker_too(client, teacher, course, school):
+    """The picker and the endpoint must agree — offering something the save
+    then drops is worse than not offering it."""
+    from django.urls import reverse
+
+    ours = _material(institution=school, title='Belonie Worksheets')
+    client.force_login(teacher)
+    body = client.get(
+        reverse('dashboard:course_detail', args=[course.id])).content.decode()
+    assert 'Belonie Worksheets' in body
+
+
+def test_another_schools_material_is_still_refused(
+        client, teacher, course, other_school):
+    theirs = _material(institution=other_school, title='Praslin Notes')
+
+    _attach(client, teacher, course, [theirs.id])
+
+    course.refresh_from_db()
+    assert list(course.shared_materials.all()) == []
+
+
+def test_a_material_on_a_platform_course_is_attachable_whatever_its_own_school(
+        client, teacher, course, other_school):
+    """The sharing rule joins on course_id alone, so this is already visible
+    to every school — the picker must offer what the rule shares."""
+    platform_course = Course.objects.create(
+        title='Platform Maths', institution=None,
+        subject_code='mathematics', grade_level='S3')
+    shared = _material(institution=other_school, course=platform_course,
+                       title='Shared Textbook')
+
+    _attach(client, teacher, course, [shared.id])
+
+    course.refresh_from_db()
+    assert [m.id for m in course.shared_materials.all()] == [shared.id]
+
+
+def test_a_courseless_material_from_another_school_is_not_attachable(
+        client, teacher, course, other_school):
+    """The `course__isnull=False` guard. Without it, the platform-course
+    clause also matches a material with NO course, handing one school's
+    private file to another."""
+    theirs = _material(institution=other_school, course=None,
+                       title='Praslin Private')
+
+    _attach(client, teacher, course, [theirs.id])
+
+    course.refresh_from_db()
+    assert list(course.shared_materials.all()) == []

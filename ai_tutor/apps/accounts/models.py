@@ -506,8 +506,26 @@ class PlatformConfig(models.Model):
         return vocab
 
     @classmethod
-    def normalize_grades(cls, tokens, vocab=None) -> set:
+    def normalize_grades(cls, tokens, vocab=None, order=None) -> set:
         """Map grade tokens onto configured codes, keeping unknown ones as-is.
+
+        Handles three spellings of the same thing:
+
+            'S3'            the code
+            'Secondary 3'   its label
+            'S1-S5'         a RANGE, which expands to every code between the
+                            two ends, in the platform's own configured order
+
+        Ranges are not a guess either: the ends are looked up in the same
+        vocabulary and the span comes from the order the grades are configured
+        in, so 'S1-S5' means whatever this platform says sits between S1 and
+        S5. They exist because `seed_seychelles` wrote them ('S1-S3',
+        'S1-S5'), and a range stored as one opaque token matched nothing —
+        `grade_levels` splits on commas, so 'S1-S5' read back as the single
+        grade "S1-S5" and a course tagged S3 shared nothing with it.
+
+        The whole token is tried FIRST, so a grade whose real name contains a
+        hyphen is never mistaken for a range.
 
         An unrecognised token is preserved rather than dropped: it still has
         to match its own spelling on the other side, which is the pre-existing
@@ -515,12 +533,40 @@ class PlatformConfig(models.Model):
         """
         if vocab is None:
             vocab = cls.grade_vocabulary()
+        if order is None:
+            order = [c.strip() for c, _ in cls.get_grade_choices() if c.strip()]
+
         out = set()
-        for t in (tokens or []):
-            t = (t or '').strip()
-            if t:
-                out.add(vocab.get(t.casefold(), t))
+        for raw in (tokens or []):
+            t = (raw or '').strip()
+            if not t:
+                continue
+            # Whole token first — a hyphen may be part of the name.
+            code = vocab.get(t.casefold())
+            if code:
+                out.add(code)
+                continue
+            expanded = cls._expand_grade_range(t, vocab, order)
+            out |= expanded if expanded else {t}
         return out
+
+    @staticmethod
+    def _expand_grade_range(token, vocab, order) -> set:
+        """'S1-S5' → every configured code from S1 to S5 inclusive, else empty."""
+        parts = [p.strip() for p in token.split('-')]
+        if len(parts) != 2 or not all(parts):
+            return set()
+        lo = vocab.get(parts[0].casefold())
+        hi = vocab.get(parts[1].casefold())
+        if not lo or not hi:
+            return set()
+        try:
+            i, j = order.index(lo), order.index(hi)
+        except ValueError:
+            return set()
+        if i > j:
+            i, j = j, i
+        return set(order[i:j + 1])
 
     def categorize_student(self, pct_achieved: float, exit_time_minutes: float = None) -> dict:
         """Categorize a student based on % of enabling objectives achieved.

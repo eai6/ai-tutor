@@ -574,12 +574,12 @@ every re-parse and silently detach everything.
 {% if can_edit_content %}
 <details class="card" style="margin-bottom:1.5rem;">
     <summary style="cursor:pointer;padding:1rem 1.25rem;font-weight:600;display:flex;align-items:center;gap:0.5rem;">
-        📎 {% trans "Attach platform-wide materials by hand" %}
+        📎 {% trans "Attach teaching materials by hand" %}
         {% if attached_material_ids %}<span style="font-size:0.75rem;font-weight:600;background:#D1FAE5;color:#065F46;padding:0.1rem 0.5rem;border-radius:999px;">{{ attached_material_ids|length }}</span>{% endif %}
     </summary>
     <div style="padding:0 1.25rem 1.25rem;">
         <p style="font-size:0.8125rem;color:var(--gray-500);margin-top:0;">
-            {% trans "These are added on top of whatever this course already inherits automatically by subject and grade — attaching by hand can only add, never remove." %}
+            {% trans "Anything from this school, or shared across the platform. These are added on top of whatever this course already inherits automatically by subject and grade — attaching by hand can only add, never remove." %}
         </p>
         {% if not attachable_materials %}
         {% comment %}
@@ -589,7 +589,12 @@ every re-parse and silently detach everything.
         a broken deploy.
         {% endcomment %}
         <p style="font-size:0.8125rem;color:var(--gray-600);background:#F8FAFC;border:1px solid var(--gray-200);border-radius:6px;padding:0.75rem 0.9rem;">
-            {% trans "There are no platform-wide materials to attach yet. A material is attachable when it was uploaded platform-wide, or when it sits on a platform-wide course — upload one as a super-admin and it appears here." %}
+            {% if unattachable_material_count %}
+            {% blocktrans count n=unattachable_material_count %}Nothing can be attached here yet, though {{ n }} teaching material exists.{% plural %}Nothing can be attached here yet, though {{ n }} teaching materials exist.{% endblocktrans %}
+            {% trans "A material is attachable when it belongs to this course's school, was uploaded platform-wide, or sits on a platform-wide course. Everything else belongs to another school, so it cannot be shared across." %}
+            {% else %}
+            {% trans "No teaching materials have been uploaded yet. Upload one to this course, to this school, or platform-wide as a super-admin, and it appears here." %}
+            {% endif %}
         </p>
         {% else %}
         <form method="post" action="{% url 'dashboard:course_shared_materials' course.id %}">

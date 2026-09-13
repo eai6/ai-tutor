@@ -560,8 +560,12 @@
                       d.unclassified.length + ' platform-wide course(s) hold materials but have no ' +
                       'subject set, so nothing can match them: ' + d.unclassified.join(', ') + '.';
             } else if (d.status === 'grade_mismatch') {
+                const covered = (d.subject_courses || [])
+                    .map(c => c.title + ' (' + (c.grade || 'no grade set') + ')')
+                    .join(', ');
                 msg = '<strong>No shared materials for this grade.</strong> Platform-wide ' +
-                      'courses exist for this subject but cover other grades.';
+                      'courses exist for this subject but cover other grades' +
+                      (covered ? ': ' + covered : '') + '.';
             } else if (d.status === 'matched_but_empty') {
                 msg = '<strong>No shared materials yet.</strong> A platform-wide course matches ' +
                       'this subject and grade but has nothing uploaded to it.';

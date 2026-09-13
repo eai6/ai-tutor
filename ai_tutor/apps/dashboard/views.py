@@ -169,6 +169,41 @@ def _safety_flag_count(institution) -> int:
     return qs.count()
 
 
+def _attachable_materials_qs(course):
+    """Teaching materials this course is allowed to attach by hand.
+
+    ONE definition, used by both the picker and the endpoint that saves it —
+    if they disagreed, the page would offer materials the save then silently
+    dropped.
+
+    Three ways in, and the third is the one that matters day to day:
+
+      institution IS NULL              uploaded platform-wide
+      on a platform-wide course        already shared to every school by the
+                                       subject+grade rule, whatever institution
+                                       is stamped on the material itself
+      institution == this course's     the school's OWN material, on its OWN
+                                       course — no tenancy boundary crossed
+
+    The third was missing, which made a school's materials unattachable to
+    that school's own courses: the common case, refused for a leak that
+    cannot happen.
+
+    `course__isnull=False` is load-bearing on the second clause. Without it
+    `course__institution__isnull=True` also matches a material with NO course,
+    which would offer one school's private material to another.
+    """
+    from ai_tutor.apps.dashboard.models import TeachingMaterialUpload
+
+    rule = (
+        Q(institution__isnull=True)
+        | Q(course__isnull=False, course__institution__isnull=True)
+    )
+    if getattr(course, 'institution_id', None):
+        rule |= Q(institution_id=course.institution_id)
+    return TeachingMaterialUpload.objects.filter(rule).distinct()
+
+
 def _inherited_materials_summary(course):
     """For a school course, summarise platform-wide materials it inherits.
 
@@ -1938,14 +1973,17 @@ def course_detail(request, course_id):
         # another. Tested.
         'attachable_materials': (
             [] if is_platform_wide else list(
-                TeachingMaterialUpload.objects
-                .filter(
-                    Q(institution__isnull=True)
-                    | Q(course__isnull=False, course__institution__isnull=True)
-                )
-                .select_related('course')
-                .distinct()
+                _attachable_materials_qs(course)
+                .select_related('course', 'institution')
                 .order_by('subject_name', 'title')[:200]
+            )
+        ),
+        # What exists but cannot be attached, so an empty picker can say why
+        # rather than just being empty.
+        'unattachable_material_count': (
+            0 if is_platform_wide else (
+                TeachingMaterialUpload.objects.count()
+                - _attachable_materials_qs(course).count()
             )
         ),
         'attached_material_ids': (
@@ -8140,6 +8178,15 @@ def material_inheritance_preview(request):
         'material_count': summary.get('material_count', 0),
         'from_courses': [c.title for c in summary.get('platform_courses', [])],
         'unclassified': [c.title for c in summary.get('unclassified_courses', [])],
+        # Name the grades the subject's platform courses actually carry. The
+        # message used to say only "they cover other grades", which is not a
+        # diagnosis — the whole problem is that a grade can be stored in a
+        # spelling nobody expected, and the one thing that identifies it is
+        # the value itself.
+        'subject_courses': [
+            {'title': c.title, 'grade': c.grade_level or ''}
+            for c in summary.get('subject_courses', [])
+        ],
     })
 
 
@@ -8171,11 +8218,7 @@ def course_shared_materials(request, course_id):
     posted_ids = {int(i) for i in request.POST.getlist('material_ids') if i.isdigit()}
     # Platform-wide only, and re-read from the DB rather than trusting the
     # post: an id for another school's material simply will not be found.
-    allowed = TeachingMaterialUpload.objects.filter(
-        Q(institution__isnull=True)
-        | Q(course__isnull=False, course__institution__isnull=True),
-        id__in=posted_ids,
-    ).distinct()
+    allowed = _attachable_materials_qs(course).filter(id__in=posted_ids)
     course.shared_materials.set(allowed)
 
     n = allowed.count()

@@ -100,3 +100,69 @@ def test_the_engine_agrees_with_the_page(school, platform_maths):
     course = _school_course(school, 'S3')
     ids = CurriculumKnowledgeBase._global_upload_ids_matching_course(course)
     assert len(ids) == 1
+
+
+# ---------------------------------------------------------------------------
+# Ranges. The third spelling, and the one that actually bit production:
+# `seed_seychelles` wrote 'S1-S3' and 'S1-S5', and grade_levels splits on
+# commas — so a range read back as ONE opaque grade called "S1-S5" that
+# matched nothing at all.
+# ---------------------------------------------------------------------------
+
+def test_a_range_expands_over_the_configured_order(db):
+    assert PlatformConfig.normalize_grades(['S1-S3']) == {'S1', 'S2', 'S3'}
+    assert PlatformConfig.normalize_grades(['S1-S5']) == {'S1', 'S2', 'S3', 'S4', 'S5'}
+
+
+def test_a_backwards_range_is_read_the_same_way(db):
+    assert PlatformConfig.normalize_grades(['S3-S1']) == {'S1', 'S2', 'S3'}
+
+
+def test_a_range_written_with_labels_expands_too(db):
+    assert PlatformConfig.normalize_grades(
+        ['Secondary 1-Secondary 3']) == {'S1', 'S2', 'S3'}
+
+
+def test_a_range_ending_outside_the_vocabulary_is_left_alone(db):
+    """No guessing past what the platform defines — S9 is not a grade here."""
+    assert PlatformConfig.normalize_grades(['S1-S9']) == {'S1-S9'}
+
+
+def test_a_ranged_platform_course_shares_with_one_grade(school):
+    """The production shape: the platform course spans S1-S5, the school
+    course is S3, and ticking S3 must not empty the shelf."""
+    pc = Course.objects.create(
+        title='Mathematics', institution=None,
+        subject_code='mathematics', grade_level='S1-S5')
+    TeachingMaterialUpload.objects.create(
+        course=pc, institution=None, title='Maths Textbook',
+        original_filename='t.pdf', file_path='/tmp/t.pdf')
+
+    summary = _inherited_materials_summary(_school_course(school, 'S3'))
+    assert summary['status'] == 'matched'
+    assert summary['material_count'] == 1
+
+
+def test_a_ranged_course_still_excludes_a_grade_outside_it(school):
+    pc = Course.objects.create(
+        title='Mathematics', institution=None,
+        subject_code='mathematics', grade_level='S1-S2')
+    TeachingMaterialUpload.objects.create(
+        course=pc, institution=None, title='Book',
+        original_filename='t.pdf', file_path='/tmp/t.pdf')
+
+    summary = _inherited_materials_summary(_school_course(school, 'S5'))
+    assert summary['status'] == 'grade_mismatch'
+
+
+def test_the_mismatch_message_names_the_grades_it_found(school):
+    """"They cover other grades" is not a diagnosis. The stored value is the
+    only thing that identifies an unexpected spelling, so it has to be shown."""
+    Course.objects.create(
+        title='Mathematics Lower', institution=None,
+        subject_code='mathematics', grade_level='S1-S2')
+
+    summary = _inherited_materials_summary(_school_course(school, 'S5'))
+    assert summary['status'] == 'grade_mismatch'
+    assert [(c.title, c.grade_level) for c in summary['subject_courses']] == [
+        ('Mathematics Lower', 'S1-S2')]
