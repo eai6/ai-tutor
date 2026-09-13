@@ -3173,7 +3173,14 @@ def lesson_session_report(request, lesson_id):
             if eo_achieved:
                 achieved_count += 1
             else:
-                weak_objectives.append(eo_text[:60])
+                # The FULL objective, not eo_text[:60].
+                #
+                # That slice cut mid-word — "Determine the horizontal easting
+                # value for a four-figure gri" — and the truncated string was
+                # also the grouping key, so two objectives sharing a 60-char
+                # prefix silently merged into one count. Templates that want it
+                # short can truncate for display; the data stays whole.
+                weak_objectives.append(eo_text)
 
         # Exit ticket score
         exit_attempt = ExitTicketAttempt.objects.filter(
@@ -9028,6 +9035,34 @@ def session_chat_history(request, session_id):
             active_seconds += max(0, min(tail, IDLE_CAP_SECONDS))
         duration_minutes = round(active_seconds / 60, 1)
 
+    # The score comes from the ATTEMPT, not from engine_state.
+    #
+    # The engine writes engine_state['exit_ticket_score'] only when the student
+    # passes, so a failed attempt showed no score at all — and on session 116 a
+    # PASSED attempt scoring 9/10 had no key either, so the block simply never
+    # rendered. The ExitTicketAttempt row has the number in both cases.
+    #
+    # passing is read off the attempt too rather than compared against a
+    # hardcoded 8: the threshold is ExitTicket.passing_score and it is
+    # configurable per ticket.
+    latest_attempt = (
+        ExitTicketAttempt.objects
+        .filter(session=session, completed_at__isnull=False)
+        .select_related('exit_ticket')
+        .order_by('-completed_at')
+        .first()
+    )
+    if latest_attempt is not None:
+        exit_score = latest_attempt.score
+        exit_total = (getattr(latest_attempt.exit_ticket, 'questions_per_attempt', None)
+                      or state.get('exit_ticket_total') or 10)
+        exit_passed = latest_attempt.passed
+    else:
+        # Legacy sessions that predate ExitTicketAttempt rows.
+        exit_score = state.get('exit_ticket_score')
+        exit_total = state.get('exit_ticket_total') or 10
+        exit_passed = None
+
     context = {
         **request.staff_ctx,
         'session': session,
@@ -9043,18 +9078,16 @@ def session_chat_history(request, session_id):
             'exchange_count',
             sum(1 for t in turns if t.role == 'student'),
         ),
-        'exit_score': state.get('exit_ticket_score'),
-        'exit_total': state.get('exit_ticket_total'),
+        'exit_score': exit_score,
+        'exit_total': exit_total,
+        'exit_passed': exit_passed,
         'covered_eos': state.get('covered_enabling_objectives', []),
         'failed_eos': state.get('exit_ticket_failed_eos', []),
         # Whether session_exit_review has anything to show. That view redirects
         # to the monitor with a flash when there is no attempt, so linking
         # unconditionally would bounce a teacher out of the transcript they are
-        # reading. Read from ExitTicketAttempt, not engine_state: the engine
-        # only writes exit_ticket_score when the student PASSES, so a failed
-        # attempt — the one most worth reviewing — leaves the state key unset.
-        'has_exit_review': ExitTicketAttempt.objects.filter(
-            session=session, completed_at__isnull=False).exists(),
+        # reading.
+        'has_exit_review': latest_attempt is not None,
     }
     return render(request, 'dashboard/session_chat_history.html', context)
 

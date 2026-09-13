@@ -343,22 +343,52 @@ class TestTheTranscriptOffersTheExitReview:
             answers=[], score=score, passed=passed,
             completed_at=timezone.now())
 
-    def test_a_failed_attempt_still_offers_the_link(self, client, teacher,
-                                                    school, lesson):
-        """The engine writes engine_state's exit_ticket_score only on a PASS,
-        so the score block never renders for a failed attempt — which is the
-        one a teacher most wants to read."""
+    def test_a_failed_attempt_shows_its_score(self, client, teacher, school,
+                                              lesson):
+        """engine_state carries exit_ticket_score only on a PASS, so reading it
+        from there showed nothing for a failed attempt — and nothing for a
+        passed one whose session never got the key either (session 116 scored
+        9/10 and rendered no score at all). The attempt row has the number."""
         session = _worked(_student(school, 'amara'), lesson, school)
         self._attempt(session, lesson, score=1, passed=False)
 
         client.force_login(teacher)
         response = client.get(reverse('dashboard:session_chat_history',
                                       args=[session.id]))
+        body = response.content.decode()
 
-        assert response.context['has_exit_review'] is True
-        assert response.context['exit_score'] is None
-        assert reverse('dashboard:session_exit_review',
-                       args=[session.id]) in response.content.decode()
+        assert response.context['exit_score'] == 1
+        assert response.context['exit_total'] == 10
+        assert response.context['exit_passed'] is False
+        assert '1/10' in body
+        assert 'Did not pass' in body
+        assert reverse('dashboard:session_exit_review', args=[session.id]) in body
+
+    def test_a_passed_attempt_shows_its_score(self, client, teacher, school,
+                                              lesson):
+        session = _worked(_student(school, 'amara'), lesson, school)
+        self._attempt(session, lesson, score=9, passed=True)
+
+        client.force_login(teacher)
+        body = client.get(reverse('dashboard:session_chat_history',
+                                  args=[session.id])).content.decode()
+        assert '9/10' in body
+        assert 'Passed' in body
+
+    def test_passing_follows_the_ticket_threshold_not_a_hardcoded_eight(
+            self, client, teacher, school, lesson):
+        """The old template compared exit_score >= 8. passing_score is a field
+        and a teacher can set it to 6."""
+        from ai_tutor.apps.tutoring.models import ExitTicket
+        session = _worked(_student(school, 'amara'), lesson, school)
+        attempt = self._attempt(session, lesson, score=6, passed=True)
+        ExitTicket.objects.filter(pk=attempt.exit_ticket_id).update(passing_score=6)
+
+        client.force_login(teacher)
+        response = client.get(reverse('dashboard:session_chat_history',
+                                      args=[session.id]))
+        assert response.context['exit_passed'] is True
+        assert 'Passed' in response.content.decode()
 
     def test_no_attempt_means_no_link(self, client, teacher, school, lesson):
         """session_exit_review redirects out to the monitor when there is no

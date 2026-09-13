@@ -206,32 +206,29 @@ source of truth. EO system is being deprecated (see
 memory/pilot_session_plan.md).
 {% endcomment %}
 
-{% if exit_score is not None %}
+{% comment %}
+One block. The score comes from the ExitTicketAttempt row, so it shows for a
+failed attempt as well as a passed one — engine_state only carries it on a
+pass, which is why a 9/10 could render nothing at all. exit_passed comes off
+the attempt too, rather than comparing against a hardcoded 8: the threshold is
+ExitTicket.passing_score and it is configurable per ticket.
+{% endcomment %}
+{% if exit_score is not None or has_exit_review %}
 <div class="exit-result">
     <h3>{% trans "Exit Ticket" %}</h3>
-    <span class="exit-score-big {% if exit_score >= 8 %}exit-pass{% else %}exit-fail{% endif %}">
+    {% if exit_score is not None %}
+    <span class="exit-score-big {% if exit_passed %}exit-pass{% else %}exit-fail{% endif %}">
         {{ exit_score }}/{{ exit_total|default:"10" }}
     </span>
     <span style="margin-left:0.5rem;font-size:0.875rem;color:#71717a;">
-        {% if exit_score >= 8 %}{% trans "Passed" %}{% else %}{% trans "Did not pass" %}{% endif %}
+        {% if exit_passed %}{% trans "Passed" %}{% else %}{% trans "Did not pass" %}{% endif %}
     </span>
+    {% else %}
+    <span style="font-size:0.875rem;color:#71717a;">{% trans "Attempted" %}</span>
+    {% endif %}
     {% if has_exit_review %}
     <a href="{% url 'dashboard:session_exit_review' session.id %}" class="btn btn-secondary btn-sm" style="margin-left:0.75rem;">{% trans "Review answers" %}</a>
     {% endif %}
-</div>
-{% endif %}
-
-{% comment %}
-A failed attempt leaves engine_state's exit_ticket_score unset — the engine
-only writes it on a pass — so the block above does not render for exactly the
-student whose answers a teacher most wants to read. This is the way in for
-those sessions.
-{% endcomment %}
-{% if has_exit_review and exit_score is None %}
-<div class="exit-result">
-    <h3>{% trans "Exit Ticket" %}</h3>
-    <span style="font-size:0.875rem;color:#71717a;">{% trans "Attempted — open the review to see each answer." %}</span>
-    <a href="{% url 'dashboard:session_exit_review' session.id %}" class="btn btn-secondary btn-sm" style="margin-left:0.75rem;">{% trans "Review answers" %}</a>
 </div>
 {% endif %}
 
