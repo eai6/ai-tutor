@@ -23,6 +23,124 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 logger = logging.getLogger(__name__)
 
 
+def run_figure_judges_for_steps(lesson, steps, *, force_rejudge=False):
+    """Review the FIGURES already attached to a lesson's steps.
+
+    The figure_alignment vision judge has only ever run at generation time,
+    hooked into image_service.get_or_generate_image. So a figure generated
+    before that hook existed, or one whose judge call skipped (no bytes, no
+    provider, a timeout), was never reviewed and never would be — the
+    catch-up sweep looked at step text and exit-ticket questions and walked
+    straight past the images.
+
+    This is the catch-up half: it re-reads the stored image and judges it
+    against the step objective and the lesson objective, exactly as the
+    generation-time hook does.
+
+    Verdicts land on the image dict itself, under the same
+    ``judge_outputs.figure_alignment`` key image_service writes, so a figure
+    reviewed here and one reviewed at generation are indistinguishable
+    downstream.
+
+    Returns (reviewed, skipped). Fail-soft per image: one bad fetch does not
+    stop the rest.
+    """
+    from ai_tutor.apps.tutoring.image_service import ImageGenerationService
+
+    reviewed = skipped = 0
+    try:
+        from ai_tutor.apps.curriculum.content_judges.figure_alignment import (
+            run_figure_alignment_judge,
+        )
+    except Exception as exc:                                   # noqa: BLE001
+        logger.warning("[FigureReview] import failed: %s", exc)
+        return 0, 0
+
+    service = None
+    course = getattr(getattr(lesson, 'unit', None), 'course', None)
+    institution = getattr(course, 'institution', None)
+
+    for step in steps:
+        media = step.media or {}
+        images = media.get('images') or []
+        if not images:
+            continue
+
+        touched = False
+        for img in images:
+            url = (img or {}).get('url') or ''
+            if not url:
+                # Nothing generated yet — that is the image sweep's job, not
+                # the reviewer's.
+                continue
+            existing = (img.get('judge_outputs') or {}).get('figure_alignment')
+            if existing and not force_rejudge:
+                skipped += 1
+                continue
+
+            if service is None:
+                service = ImageGenerationService(
+                    lesson=lesson, institution=institution)
+
+            image_bytes = None
+            try:
+                image_bytes = service._read_image_bytes(url)
+            except Exception as exc:                           # noqa: BLE001
+                logger.warning("[FigureReview] byte read failed: %s", exc)
+            if not image_bytes:
+                # A URL that cannot be fetched is worth recording rather than
+                # silently passing over: it is itself a broken figure.
+                img.setdefault('judge_outputs', {})['figure_alignment'] = {
+                    'passed': False, 'violations': ['FIGURE_UNREACHABLE'],
+                    'reasoning': 'The stored image URL could not be read.',
+                    'skipped': True, 'skip_reason': 'no_bytes',
+                }
+                touched = True
+                skipped += 1
+                continue
+
+            try:
+                verdict = run_figure_alignment_judge(
+                    image_bytes=image_bytes,
+                    image_media_type=service._guess_mime(url),
+                    image_prompt=img.get('description', '') or '',
+                    lesson_subject=getattr(course, 'title', '') or '',
+                    lesson_grade=getattr(course, 'grade_level', '') or '',
+                    lesson_title=getattr(lesson, 'title', '') or '',
+                    lesson_objective=getattr(lesson, 'objective', '') or '',
+                    # The real step objective, which the generation-time hook
+                    # cannot reach: image_service takes no step argument and
+                    # falls back to the lesson objective, as its own comment
+                    # says. Reviewing here is strictly better informed.
+                    step_objective=(getattr(step, 'question', '')
+                                    or getattr(step, 'teacher_script', '')
+                                    or getattr(lesson, 'objective', '') or '')[:600],
+                )
+            except Exception as exc:                           # noqa: BLE001
+                logger.warning("[FigureReview] judge raised: %s", exc)
+                skipped += 1
+                continue
+
+            img.setdefault('judge_outputs', {})['figure_alignment'] = {
+                'passed': verdict.passed,
+                'violations': list(verdict.violations or []),
+                'reasoning': verdict.reasoning or '',
+                'recommended_fix': verdict.recommended_fix or '',
+                'provider': verdict.provider or '',
+                'model_name': verdict.model_name or '',
+                'skipped': verdict.skipped,
+                'skip_reason': verdict.skip_reason or '',
+            }
+            touched = True
+            reviewed += 1
+
+        if touched:
+            step.media = media
+            step.save(update_fields=['media'])
+
+    return reviewed, skipped
+
+
 def _run_content_judges_for_steps(lesson, steps, *, force_model_config=None):
     """Fan out the factual_step content judge across newly-persisted
     LessonStep rows.

@@ -822,7 +822,7 @@ can_regenerate_courses.
     <span style="font-size: 1.25rem;">🧹</span>
     <div style="flex: 1; min-width: 240px;">
         <strong style="color: #0369a1;">Catch up on pending work</strong>
-        <div style="font-size: 0.8rem; color: #0c4a6e;">Sweep the course for two common gaps: images that never rendered, and lesson / exit-ticket content that hasn't been audited by the AI judges yet. Both run in the background and are idempotent — already-done items are skipped. You can pick a specific provider/model per run (task #216).</div>
+        <div style="font-size: 0.8rem; color: #0c4a6e;">Sweep the course for two common gaps: images that never rendered, and content that hasn't been audited by the AI judges yet — lesson steps, exit-ticket questions, and the generated figures themselves, checked against the step and lesson objectives. Both run in the background, skip parked lessons, and are idempotent: already-done items are skipped unless you tick "Re-do already-done". You can pick a specific provider/model per run, and stop either run once it starts.</div>
     </div>
     {% comment %}
     Images form: provider dropdown + force checkbox + button. The
@@ -881,7 +881,7 @@ can_regenerate_courses.
         </label>
         <button type="submit" class="btn btn-secondary btn-sm"
                 style="border-color:#7dd3fc; color:#0369a1;"
-                title="Run content judges (factual, pedagogy, safety, exit-question). Pending: only unreviewed. With 'Re-do already-done' checked: re-judge everything (overwrite).">
+                title="Run content judges (factual, pedagogy, safety, exit-question, and a vision check on every generated figure). Pending: only unreviewed. With 'Re-do already-done' checked: re-judge everything (overwrite).">
             🔍 Run AI review
         </button>
     </form>

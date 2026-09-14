@@ -1607,6 +1607,7 @@ def review_unreviewed_content_async(
         _run_fill_in_blank_judge_for_qs,
         _run_short_answer_judge_for_qs,
         _run_matching_judge_for_qs,
+        run_figure_judges_for_steps,
     )
     from ai_tutor.apps.llm.models import ModelConfig
 
@@ -1674,6 +1675,8 @@ def review_unreviewed_content_async(
         exit_qs_reviewed = 0
         exit_qs_skipped = 0
         lessons_touched = 0
+        figures_reviewed = 0
+        figures_skipped = 0
 
         def _review_cancelled():
             """Re-read the flag: Cancel is set by another request, in another
@@ -1752,6 +1755,28 @@ def review_unreviewed_content_async(
                         "for lesson %s", lesson.id,
                     )
 
+            # Figures. The figure_alignment vision judge has only ever run at
+            # generation time, so a figure produced before that hook existed —
+            # or one whose judge call skipped — was never reviewed and never
+            # would be. Reviewed across ALL the lesson's steps, not just the
+            # unreviewed ones: a step's TEXT being audited says nothing about
+            # whether its image was.
+            try:
+                fig_reviewed, fig_skipped = run_figure_judges_for_steps(
+                    lesson, list(lesson.steps.order_by('order_index')),
+                    force_rejudge=force_rejudge,
+                )
+                figures_reviewed += fig_reviewed
+                figures_skipped += fig_skipped
+                if fig_reviewed:
+                    log(f"   🖼️ reviewed {fig_reviewed} figure(s)")
+            except Exception as exc:
+                log(f"   ⚠️ figure judges crashed: {exc}")
+                logger.exception(
+                    "review_unreviewed_content_async figure judges failed "
+                    "for lesson %s", lesson.id,
+                )
+
             if unreviewed_exit_qs:
                 # Dispatch by question_type — there are 4 separate judge
                 # functions and the old code only called the MCQ one,
@@ -1812,7 +1837,9 @@ def review_unreviewed_content_async(
             f"✅ Review done — touched {lessons_touched}/{total_lessons} "
             f"lessons · {steps_reviewed} steps reviewed · "
             f"{exit_qs_reviewed} exit-Qs reviewed · "
-            f"{steps_skipped} steps + {exit_qs_skipped} exit-Qs already audited (skipped)"
+            f"{figures_reviewed} figures reviewed · "
+            f"{steps_skipped} steps + {exit_qs_skipped} exit-Qs "
+            f"+ {figures_skipped} figures already audited (skipped)"
         )
 
         if upload:
@@ -1827,6 +1854,8 @@ def review_unreviewed_content_async(
             'exit_qs_reviewed': exit_qs_reviewed,
             'steps_skipped': steps_skipped,
             'exit_qs_skipped': exit_qs_skipped,
+            'figures_reviewed': figures_reviewed,
+            'figures_skipped': figures_skipped,
         }
     except Exception as exc:
         logger.exception(
