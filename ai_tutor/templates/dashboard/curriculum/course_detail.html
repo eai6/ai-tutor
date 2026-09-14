@@ -1225,6 +1225,13 @@ to see what went and put it back.
                 <input type="hidden" name="restore" value="1">
                 <button type="submit" class="btn btn-secondary btn-sm">{% trans "Restore" %}</button>
             </form>
+            <form method="post" action="{% url 'dashboard:unit_purge' unit.id %}" style="display:inline;"
+                  onsubmit="return confirm('{% trans "Delete this unit and its lessons for good? This cannot be undone. It is refused if any student has used them." %}');">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-sm"
+                        style="background:#FEF2F2;color:#991B1B;border:1px solid #FECACA;border-radius:6px;padding:0.25rem 0.6rem;font-weight:600;"
+                        title="{% trans 'Delete permanently. Refused when students have used these lessons.' %}">{% trans "Delete" %}</button>
+            </form>
             {% endif %}
         </div>
         {% endfor %}

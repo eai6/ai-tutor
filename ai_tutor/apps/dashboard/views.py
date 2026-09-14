@@ -8017,6 +8017,77 @@ def unit_delete(request, unit_id):
 
 
 @teacher_required
+@require_POST
+def unit_purge(request, unit_id):
+    """Delete a PARKED unit for good — but only when no student ever used it.
+
+    Everything else on this page parks rather than deletes, for a reason:
+    TutorSession, StudentLessonProgress, ExitTicket and LessonPackVersion all
+    CASCADE off Lesson, so deleting a unit takes the transcripts, the mastery
+    rows and the exit-ticket attempts with it. That is the failure that cost a
+    pilot its competency history.
+
+    So this refuses rather than asks. A unit whose lessons carry student work
+    stays parked and says how much work it found; a unit left over from an
+    earlier re-parse that nobody ever opened — the actual case behind the
+    request — deletes cleanly.
+
+    Parked-only, so removing something is always two deliberate steps.
+    """
+    from ai_tutor.apps.curriculum.models import Unit
+    from ai_tutor.apps.tutoring.models import (
+        ExitTicketAttempt, StudentLessonProgress, TutorSession,
+    )
+
+    institution = request.staff_ctx['institution']
+    if institution is not None:
+        unit = get_object_or_404(Unit, id=unit_id, course__institution=institution)
+    else:
+        unit = get_object_or_404(Unit, id=unit_id)
+    course_id = unit.course_id
+
+    if unit.retired_at is None:
+        messages.error(
+            request,
+            "Remove the unit first. Deleting is only offered for a unit that "
+            "is already parked, so it takes two deliberate steps.",
+        )
+        return redirect('dashboard:course_detail', course_id=course_id)
+
+    lesson_ids = list(unit.lessons.values_list('id', flat=True))
+    sessions = TutorSession.objects.filter(lesson_id__in=lesson_ids).count()
+    progress = StudentLessonProgress.objects.filter(
+        lesson_id__in=lesson_ids).count()
+    attempts = ExitTicketAttempt.objects.filter(
+        exit_ticket__lesson_id__in=lesson_ids).count()
+
+    if sessions or progress or attempts:
+        held = ', '.join(
+            part for part in (
+                f"{sessions} tutoring session(s)" if sessions else '',
+                f"{progress} progress record(s)" if progress else '',
+                f"{attempts} exit-ticket attempt(s)" if attempts else '',
+            ) if part
+        )
+        messages.error(
+            request,
+            f'"{unit.title}" cannot be deleted — students have used it: {held}. '
+            f'Deleting would take that work with it. It stays parked, which '
+            f'hides it from the course without losing anything.',
+        )
+        return redirect('dashboard:course_detail', course_id=course_id)
+
+    title, n = unit.title, len(lesson_ids)
+    unit.delete()
+    messages.success(
+        request,
+        f'Deleted "{title}"' + (f' and its {n} unused lesson(s)' if n else '')
+        + '. No student had opened it.',
+    )
+    return redirect('dashboard:course_detail', course_id=course_id)
+
+
+@teacher_required
 def unit_create(request, course_id):
     """Create a new unit in a course."""
     from ai_tutor.apps.curriculum.models import Unit

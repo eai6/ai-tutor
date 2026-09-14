@@ -83,6 +83,17 @@
                     <span class="spinner"></span>
                     {% trans "Processing..." %}
                 </span>
+                {% comment %}
+                Image generation is the most expensive sweep on the platform
+                and the slowest, and it was the one with no way to stop it —
+                content generation has had a Stop button all along.
+                {% endcomment %}
+                <form method="post" action="{% url 'dashboard:cancel_generation' upload.id %}" style="display: inline;">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-sm" style="background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5;" onclick="return confirm('{% trans "Stop generating images? Images already generated are kept, and re-running skips them." %}');">
+                        ⛔ {% trans "Stop Generation" %}
+                    </button>
+                </form>
                 {% elif upload.status == 'completed' %}
                 <span class="status-badge completed">
                     ✓ {% trans "Complete" %}

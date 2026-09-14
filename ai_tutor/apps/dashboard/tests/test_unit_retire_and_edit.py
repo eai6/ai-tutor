@@ -182,3 +182,69 @@ def test_another_schools_unit_cannot_be_touched(client, db, school):
     assert r.status_code == 404
     their_unit.refresh_from_db()
     assert their_unit.retired_at is None
+
+
+# ---------------------------------------------------------------------------
+# Permanent delete. Everything else on this page parks, because TutorSession,
+# StudentLessonProgress, ExitTicket and LessonPackVersion all CASCADE off
+# Lesson — deleting a unit takes student work with it.
+# ---------------------------------------------------------------------------
+
+def test_an_unused_parked_unit_can_be_deleted(client, teacher, course):
+    """The case behind the request: units left by an earlier re-parse that no
+    student ever opened."""
+    unit = Unit.objects.get(title='Old Unit')
+    client.force_login(teacher)
+    client.post(reverse('dashboard:unit_delete', args=[unit.id]), follow=True)
+    client.post(reverse('dashboard:unit_purge', args=[unit.id]), follow=True)
+
+    assert not Unit.objects.filter(id=unit.id).exists()
+    assert not Lesson.objects.filter(title='Old Lesson').exists()
+
+
+def test_a_unit_a_student_used_is_refused(client, teacher, course, school):
+    """The guard that matters. Refused, not confirmed — a dialog is not
+    enough protection for a transcript that cannot be recovered."""
+    from ai_tutor.apps.tutoring.models import TutorSession
+
+    unit = Unit.objects.get(title='Old Unit')
+    lesson = Lesson.objects.get(title='Old Lesson')
+    student = User.objects.create_user('stud', 's@example.com', 'pw')
+    TutorSession.objects.create(student=student, lesson=lesson,
+                                institution=school)
+
+    client.force_login(teacher)
+    client.post(reverse('dashboard:unit_delete', args=[unit.id]), follow=True)
+    r = client.post(reverse('dashboard:unit_purge', args=[unit.id]), follow=True)
+
+    assert Unit.objects.filter(id=unit.id).exists()
+    assert Lesson.objects.filter(id=lesson.id).exists()
+    assert TutorSession.objects.count() == 1
+    assert 'cannot be deleted' in r.content.decode()
+
+
+def test_a_live_unit_cannot_be_deleted_outright(client, teacher, course):
+    """Park first. Two deliberate steps, so nothing goes in one click."""
+    unit = Unit.objects.get(title='Old Unit')
+    client.force_login(teacher)
+    r = client.post(reverse('dashboard:unit_purge', args=[unit.id]), follow=True)
+
+    assert Unit.objects.filter(id=unit.id).exists()
+    assert 'Remove the unit first' in r.content.decode()
+
+
+def test_another_schools_unit_cannot_be_deleted(client, db, school):
+    scoped = User.objects.create_user('classteacher2', 'c2@example.com', 'pw')
+    Membership.objects.create(user=scoped, institution=school,
+                              role=Membership.Role.STAFF)
+    other = Institution.objects.create(name='Praslin', slug='praslin2')
+    their_course = Course.objects.create(title='Theirs', institution=other)
+    from django.utils import timezone
+    their_unit = Unit.objects.create(course=their_course, title='Theirs',
+                                     order_index=0, retired_at=timezone.now())
+
+    client.force_login(scoped)
+    r = client.post(reverse('dashboard:unit_purge', args=[their_unit.id]))
+
+    assert r.status_code == 404
+    assert Unit.objects.filter(id=their_unit.id).exists()

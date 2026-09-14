@@ -52,6 +52,7 @@ urlpatterns = [
     path('curriculum/course/<int:course_id>/unit/create/', views.unit_create, name='unit_create'),
     path('curriculum/unit/<int:unit_id>/edit/', views.unit_edit, name='unit_edit'),
     path('curriculum/unit/<int:unit_id>/delete/', views.unit_delete, name='unit_delete'),
+    path('curriculum/unit/<int:unit_id>/purge/', views.unit_purge, name='unit_purge'),
     
     # Unit management
     path('curriculum/unit/<int:unit_id>/lesson/create/', views.lesson_create, name='lesson_create'),

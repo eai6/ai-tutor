@@ -650,8 +650,12 @@ def generate_media_async(
         """Log to both logger and upload record."""
         logger.info(message)
         if upload:
+            # add_log already saves with update_fields=['processing_log'].
+            # A bare upload.save() here would write the WHOLE in-memory row
+            # back — including a stale is_cancelled=False — and so quietly
+            # undo a teacher pressing Stop between two log lines. The button
+            # appeared to do nothing.
             upload.add_log(message)
-            upload.save()
     
     try:
         # Live lessons only. Parked ones (Lesson.retired_at) are unreachable
@@ -673,8 +677,29 @@ def generate_media_async(
             'media_skipped': 0,
         }
         
+        def _cancelled():
+            """Has the teacher pressed Cancel since the last check?
+
+            Re-read from the DB rather than trusting the in-memory row: the
+            flag is set by a different request in a different process, so the
+            object this thread holds never sees it.
+            """
+            if not upload:
+                return False
+            try:
+                return CurriculumUpload.objects.filter(
+                    id=upload.id, is_cancelled=True).exists()
+            except Exception:                              # noqa: BLE001
+                return False
+
         lesson_num = 0
         for lesson in lessons:
+            # Checked per lesson, not per image: an image call is one unit of
+            # spend already committed, and abandoning mid-step would leave the
+            # step's media half-written.
+            if _cancelled():
+                log("⛔ Media generation cancelled by teacher.")
+                break
             lesson_num += 1
             steps = lesson.steps.all()
             
@@ -1605,8 +1630,12 @@ def review_unreviewed_content_async(
     def log(message: str):
         logger.info(message)
         if upload:
+            # add_log already saves with update_fields=['processing_log'].
+            # A bare upload.save() here would write the WHOLE in-memory row
+            # back — including a stale is_cancelled=False — and so quietly
+            # undo a teacher pressing Stop between two log lines. The button
+            # appeared to do nothing.
             upload.add_log(message)
-            upload.save()
 
     if force_model_config is not None:
         log(
@@ -1646,7 +1675,23 @@ def review_unreviewed_content_async(
         exit_qs_skipped = 0
         lessons_touched = 0
 
+        def _review_cancelled():
+            """Re-read the flag: Cancel is set by another request, in another
+            process, so the row this thread holds never sees it."""
+            if not upload:
+                return False
+            try:
+                return CurriculumUpload.objects.filter(
+                    id=upload.id, is_cancelled=True).exists()
+            except Exception:                              # noqa: BLE001
+                return False
+
         for idx, lesson in enumerate(lessons, start=1):
+            # Per lesson: a judge call already running is spend committed, and
+            # stopping mid-lesson would leave its steps partly re-judged.
+            if _review_cancelled():
+                log("⛔ Review cancelled by teacher.")
+                break
             # Steps: by default, filter to unreviewed-AND-empty so we
             # never double-judge content. When force_rejudge is True
             # (task #217 — teacher wants to re-verify with a stronger
