@@ -525,100 +525,18 @@
         <button type="submit" class="btn btn-primary">{% trans "Save AI Models" %}</button>
     </form>
 
-    {# ── Tutor Personalities (superadmin only) ── #}
-    <div class="card" style="margin-top: 2rem; margin-bottom: 1.5rem;">
-        <div class="card-header" style="cursor:pointer;" onclick="document.getElementById('personalities-body').style.display=document.getElementById('personalities-body').style.display==='none'?'block':'none'">
-            <h3 class="card-title">{% trans "Tutor Personalities" %} <small style="font-weight:normal;color:var(--gray-500);">{% trans "(click to expand)" %}</small></h3>
-        </div>
-        <div class="card-body" id="personalities-body" style="display:none;">
-            <p style="color:var(--gray-500);font-size:0.875rem;margin-bottom:1rem;">
-                {% trans "Configure personality options that students can choose from. Each personality modifies the tutor's tone." %}
-            </p>
-            {% if personalities %}
-            <table class="table" style="width:100%;margin-bottom:1.5rem;">
-                <thead>
-                    <tr>
-                        <th>{% trans "Emoji" %}</th>
-                        <th>{% trans "Name" %}</th>
-                        <th>{% trans "Description" %}</th>
-                        <th>{% trans "Status" %}</th>
-                        <th>{% trans "Actions" %}</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for p in personalities %}
-                    <tr>
-                        <td>{{ p.emoji }}</td>
-                        <td><strong>{{ p.name }}</strong></td>
-                        <td style="font-size:0.85rem;color:var(--gray-500);">{{ p.description|truncatechars:60 }}</td>
-                        <td>
-                            <form method="post" style="display:inline;">
-                                {% csrf_token %}
-                                <input type="hidden" name="action" value="toggle_personality">
-                                <input type="hidden" name="personality_id" value="{{ p.id }}">
-                                <button type="submit" class="btn btn-sm {% if p.is_active %}btn-success{% else %}btn-secondary{% endif %}" style="font-size:0.75rem;padding:0.2rem 0.5rem;">
-                                    {% if p.is_active %}{% trans "Active" %}{% else %}{% trans "Inactive" %}{% endif %}
-                                </button>
-                            </form>
-                        </td>
-                        <td>
-                            <form method="post" style="display:inline;" onsubmit="return confirm('{% blocktrans with name=p.name %}Delete personality '{{ name }}'?{% endblocktrans %}');">
-                                {% csrf_token %}
-                                <input type="hidden" name="action" value="delete_personality">
-                                <input type="hidden" name="personality_id" value="{{ p.id }}">
-                                <button type="submit" class="btn btn-sm btn-danger" style="font-size:0.75rem;padding:0.2rem 0.5rem;">{% trans "Delete" %}</button>
-                            </form>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-            {% else %}
-            <p style="color:var(--gray-400);font-style:italic;margin-bottom:1rem;">{% trans "No personalities configured. Add one below or run" %} <code>python manage.py seed_gamification</code>.</p>
-            {% endif %}
+    {% comment %}
+    "Tutor Personalities" and "AI System Prompts" used to sit here. Both were
+    removed because both were inert: simple_tutor — the only live engine —
+    reads neither. The prompt fields were only ever read by
+    conversational_tutor.py, which was retired, and the engine never consults
+    a student's chosen personality at all. Editing either changed nothing,
+    which is worse than the setting not existing: it looks like a lever.
 
-            <h4 style="font-size:0.95rem;margin-bottom:0.75rem;">{% trans "Add New Personality" %}</h4>
-            <form method="post">
-                {% csrf_token %}
-                <input type="hidden" name="action" value="add_personality">
-                <div style="display:grid;grid-template-columns:60px 1fr;gap:0.5rem;margin-bottom:0.5rem;">
-                    <input type="text" name="personality_emoji" placeholder="😊" maxlength="10" style="text-align:center;font-size:1.5rem;padding:0.3rem;">
-                    <input type="text" name="personality_name" placeholder="{% trans 'Name (e.g. Friendly)' %}" required maxlength="50">
-                </div>
-                <input type="text" name="personality_description" placeholder="{% trans 'Short description shown to students' %}" maxlength="200" style="width:100%;margin-bottom:0.5rem;">
-                <textarea name="personality_prompt" placeholder="{% trans 'System prompt modifier (injected into the tutor system prompt)' %}" required rows="3" style="width:100%;margin-bottom:0.75rem;"></textarea>
-                <button type="submit" class="btn btn-primary btn-sm">{% trans "Add Personality" %}</button>
-            </form>
-        </div>
-    </div>
-
-    {# ── AI System Prompts (superadmin only) ── #}
-    <form method="post" style="margin-top: 2rem;">
-        {% csrf_token %}
-        <input type="hidden" name="action" value="prompts">
-
-        <div class="card" style="margin-bottom: 1.5rem;">
-            <div class="card-header" style="cursor:pointer;" onclick="document.getElementById('prompts-body').style.display=document.getElementById('prompts-body').style.display==='none'?'block':'none'">
-                <h3 class="card-title">{% trans "AI System Prompts" %} <small style="font-weight:normal;color:var(--gray-500);">{% trans "(click to expand)" %}</small></h3>
-            </div>
-            <div class="card-body" id="prompts-body" style="display:none;">
-                <p style="color:var(--gray-500);font-size:0.875rem;margin-bottom:1rem;">
-                    {% trans "Edit the prompts below. They are pre-populated with the built-in defaults." %}
-                </p>
-
-                {% for pf in prompt_fields %}
-                <div class="form-group" style="margin-bottom:1.5rem;">
-                    <label class="form-label" for="{{ pf.name }}">{{ pf.label }}</label>
-
-                    <textarea class="form-control" id="{{ pf.name }}" name="{{ pf.name }}" rows="6" style="font-family:monospace;font-size:0.8rem;">{{ pf.current }}</textarea>
-                    <small style="color:var(--gray-500);">{{ pf.desc }}</small>
-                </div>
-                {% endfor %}
-            </div>
-        </div>
-
-        <button type="submit" class="btn btn-primary">{% trans "Save AI Prompts" %}</button>
-    </form>
+    The MODELS are still there (PromptPack, TutorPersonality) and so is the
+    student-side personality preference. Deleting those is a data decision,
+    not a UI one.
+    {% endcomment %}
 
     {# ── Platform backup (superadmin only) ──────────────────────────────── #}
     {# Not the anonymised export on the Overview page: that one exists to be #}

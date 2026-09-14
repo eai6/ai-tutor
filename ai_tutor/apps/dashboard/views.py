@@ -4383,98 +4383,19 @@ def settings_page(request):
 
                 messages.success(request, f"AI models updated — Tutoring: {tutor_provider}/{tutor_model}, Generation: {gen_provider}/{gen_model}, Image: {img_provider}/{img_model}.")
 
-        elif action == 'add_personality' and is_superadmin:
-            from ai_tutor.apps.accounts.models import TutorPersonality
-            p_name = request.POST.get('personality_name', '').strip()
-            p_emoji = request.POST.get('personality_emoji', '').strip()
-            p_desc = request.POST.get('personality_description', '').strip()
-            p_prompt = request.POST.get('personality_prompt', '').strip()
-            if not p_name or not p_prompt:
-                messages.error(request, "Name and prompt modifier are required.")
-            elif TutorPersonality.objects.filter(name=p_name).exists():
-                messages.error(request, f"A personality named '{p_name}' already exists.")
-            else:
-                TutorPersonality.objects.create(
-                    name=p_name, emoji=p_emoji,
-                    description=p_desc, system_prompt_modifier=p_prompt,
-                )
-                messages.success(request, f"Personality '{p_name}' created.")
-
-        elif action == 'toggle_personality' and is_superadmin:
-            from ai_tutor.apps.accounts.models import TutorPersonality
-            pid = request.POST.get('personality_id')
-            p = TutorPersonality.objects.filter(id=pid).first()
-            if p:
-                p.is_active = not p.is_active
-                p.save(update_fields=['is_active'])
-                status = "activated" if p.is_active else "deactivated"
-                messages.success(request, f"Personality '{p.name}' {status}.")
-
-        elif action == 'delete_personality' and is_superadmin:
-            from ai_tutor.apps.accounts.models import TutorPersonality
-            pid = request.POST.get('personality_id')
-            p = TutorPersonality.objects.filter(id=pid).first()
-            if p:
-                name = p.name
-                p.delete()
-                messages.success(request, f"Personality '{name}' deleted.")
-
-        elif action == 'prompts' and is_superadmin:
-            from ai_tutor.apps.llm.models import PromptPack
-            prompt_pack = PromptPack.objects.filter(
-                institution__isnull=True, is_active=True
-            ).first()
-            if not prompt_pack:
-                prompt_pack = PromptPack.objects.create(
-                    institution=None,
-                    name='Default',
-                    system_prompt='',
-                    is_active=True,
-                )
-            prompt_pack.tutor_system_prompt = request.POST.get('tutor_system_prompt', '')
-            prompt_pack.content_generation_prompt = request.POST.get('content_generation_prompt', '')
-            prompt_pack.exit_ticket_prompt = request.POST.get('exit_ticket_prompt', '')
-            prompt_pack.grading_prompt = request.POST.get('grading_prompt', '')
-            prompt_pack.image_generation_prompt = request.POST.get('image_generation_prompt', '')
-            prompt_pack.safety_prompt = request.POST.get('safety_prompt', '')
-            prompt_pack.save()
-            messages.success(request, "AI prompts updated.")
+        # The 'add_personality' / 'toggle_personality' / 'delete_personality'
+        # / 'prompts' handlers were removed with the two settings cards they
+        # served. Both cards were inert: simple_tutor, the only live engine,
+        # reads neither PromptPack nor a student's chosen personality. The
+        # prompt fields were only ever consulted by conversational_tutor.py,
+        # which was retired.
 
         return redirect('dashboard:settings')
 
-    # Load prompt pack and prompt defaults for display
-    prompt_pack = None
-    prompt_fields = []
+    # PromptPack is no longer built for the template: the card that edited it
+    # is gone, and nothing on the live path reads it.
     platform_config = None
     if is_superadmin:
-        from ai_tutor.apps.llm.models import PromptPack
-        prompt_pack = PromptPack.objects.filter(
-            institution__isnull=True, is_active=True
-        ).first()
-
-        from ai_tutor.apps.llm.prompts import get_prompt_defaults
-        PROMPT_DEFAULTS = get_prompt_defaults()
-
-        # Build structured list for template: (field_name, label, desc, default, current)
-        field_meta = [
-            ('tutor_system_prompt', 'Tutor System Prompt', 'The main system prompt for the conversational tutor.'),
-            ('safety_prompt', 'Safety Prompt', 'Safety guidelines injected into the tutor prompt.'),
-            ('content_generation_prompt', 'Content Generation Prompt', 'System prompt for AI-generated lesson content.'),
-            ('exit_ticket_prompt', 'Exit Ticket Prompt', 'System prompt for exit ticket question generation.'),
-            ('grading_prompt', 'Grading Prompt', 'System prompt for AI answer grading.'),
-            ('image_generation_prompt', 'Image Generation Context', 'Prefix added to all image generation prompts.'),
-        ]
-        for fname, label, desc in field_meta:
-            current = getattr(prompt_pack, fname, '') if prompt_pack else ''
-            default_value = PROMPT_DEFAULTS.get(fname, '')
-            prompt_fields.append({
-                'name': fname,
-                'label': label,
-                'desc': desc,
-                'default': default_value,
-                'current': current or default_value,
-            })
-
         platform_config = PlatformConfig.load()
 
     # AI Model config context (superadmin only) — per-purpose
@@ -4526,12 +4447,6 @@ def settings_page(request):
             'google': 'gemini-3.1-flash-image-preview',
         })
 
-    # Tutor personalities (superadmin)
-    personalities = []
-    if is_superadmin:
-        from ai_tutor.apps.accounts.models import TutorPersonality
-        personalities = TutorPersonality.objects.all()
-
     all_timezones = sorted(zoneinfo.available_timezones())
     all_schools = Institution.objects.exclude(slug=Institution.GLOBAL_SLUG).order_by('name') if is_superadmin else []
     # Active schools list for the user's own profile-school dropdown
@@ -4549,8 +4464,6 @@ def settings_page(request):
     context = {
         **request.staff_ctx,
         'is_superadmin': is_superadmin,
-        'prompt_pack': prompt_pack,
-        'prompt_fields': prompt_fields,
         'platform_config': platform_config,
         'all_timezones': all_timezones,
         'all_schools': all_schools,
@@ -4578,7 +4491,6 @@ def settings_page(request):
         'provider_choices': provider_choices,
         'provider_defaults_json': provider_defaults_json,
         'img_provider_defaults_json': img_provider_defaults_json,
-        'personalities': personalities,
     }
 
     # Platform backup. The inventory is a row count on every model in eight app
