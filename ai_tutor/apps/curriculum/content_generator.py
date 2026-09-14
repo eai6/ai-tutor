@@ -141,6 +141,41 @@ def run_figure_judges_for_steps(lesson, steps, *, force_rejudge=False):
     return reviewed, skipped
 
 
+def _ensure_warm_up_step(lesson):
+    """Guarantee the lesson has its warm-up container at order_index 0.
+
+    The row holds no question: a LessonStep is shared curriculum while a
+    warm-up is drawn from what THIS student already mastered, chosen at
+    runtime by simple_tutor/warm_up.py. Same shape the 0034 backfill and the
+    add_warm_up_steps command create.
+
+    Idempotent. If a warm-up exists at some other index — a lesson whose steps
+    were renumbered — it is moved to 0 rather than duplicated.
+    """
+    from ai_tutor.apps.curriculum.models import LessonStep
+
+    existing = LessonStep.objects.filter(
+        lesson=lesson, step_type=LessonStep.StepType.WARM_UP,
+    ).order_by('order_index').first()
+    if existing is not None:
+        if existing.order_index != 0:
+            existing.order_index = 0
+            existing.save(update_fields=['order_index'])
+        return existing
+
+    return LessonStep.objects.create(
+        lesson=lesson,
+        order_index=0,
+        step_type=LessonStep.StepType.WARM_UP,
+        phase='engage',
+        question='',
+        enabling_objective='',
+        teacher_script='',
+        priority=LessonStep.Priority.REQUIRED,
+        answer_type=LessonStep.AnswerType.MULTIPLE_CHOICE,
+    )
+
+
 def _run_content_judges_for_steps(lesson, steps, *, force_model_config=None):
     """Fan out the factual_step content judge across newly-persisted
     LessonStep rows.
@@ -2858,6 +2893,24 @@ CONTENT GUIDELINES:
             flush=True,
         )
 
+        # order_index 0 belongs to the warm-up, always.
+        #
+        # Nothing but migration 0034 has ever created a warm-up step, so every
+        # lesson generated since has opened without one — and worse,
+        # regenerating an OLD lesson destroyed the warm-up it had: the upsert
+        # below overwrote index 0 with a teach step, or the orphan sweep
+        # further down deleted it for not being in the generated set. Either
+        # way it did not survive, which is why freshly generated courses never
+        # start with a warm-up while older ones still do.
+        #
+        # Indices are reassigned from 1 rather than trusting what the model
+        # emitted, so the reservation holds whatever the LLM numbered from.
+        for new_index, step_data in enumerate(
+                sorted(steps, key=lambda s: s.get('order_index', 0)), start=1):
+            step_data['order_index'] = new_index
+
+        _ensure_warm_up_step(lesson)
+
         persisted_steps = []
         for step_data in steps:
             step, created = LessonStep.objects.update_or_create(
@@ -2896,10 +2949,13 @@ CONTENT GUIDELINES:
         # Drop orphan tail steps from a previous (longer) generation —
         # otherwise regenerating a 6-step lesson into 4 steps leaves
         # the old step 5 + 6 sitting in the DB.
-        kept_indices = {s.get('order_index', 0) for s in steps}
+        # Index 0 is the warm-up and is never part of the generated set, so it
+        # must be held out of the sweep explicitly — otherwise every
+        # regeneration deletes it as an orphan.
+        kept_indices = {0} | {s.get('order_index', 0) for s in steps}
         orphan_qs = LessonStep.objects.filter(lesson=lesson).exclude(
             order_index__in=kept_indices,
-        )
+        ).exclude(step_type=LessonStep.StepType.WARM_UP)
         orphan_count = orphan_qs.count()
         if orphan_count:
             logger.info(
