@@ -1,0 +1,11 @@
+# Nightly database + media backup to S3. Installed in phase 6 of the deployment
+# plan; assumes the checkout lives at /opt/ai-tutor, as the plan and the
+# <prefix>-deploy SSM document both do.
+[Unit]
+Description=AI Tutor nightly backup to S3
+Wants=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/ai-tutor/deploy/compose/backup-to-s3.sh nightly

@@ -15,5 +15,8 @@
   {"ParameterKey": "AlertEmail", "ParameterValue": "ops@example.org"},
   {"ParameterKey": "DiskAlarmPercent", "ParameterValue": "80"},
   {"ParameterKey": "SnapshotRetainCount", "ParameterValue": "7"},
-  {"ParameterKey": "BackupRetentionDays", "ParameterValue": "90"}
+  {"ParameterKey": "BackupRetentionDays", "ParameterValue": "90"},
+  {"ParameterKey": "GitHubRepository", "ParameterValue": "owner/repo"},
+  {"ParameterKey": "GitHubEnvironment", "ParameterValue": "example-prod"},
+  {"ParameterKey": "CreateGitHubOidcProvider", "ParameterValue": "true"}
 ]

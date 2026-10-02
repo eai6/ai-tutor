@@ -48,7 +48,9 @@ services:
     # NOTE: `up` without a prior `pull` will BUILD, because build: is defined
     # and the image is not local yet. Always `docker compose pull` first unless
     # you mean to build.
-    image: ghcr.io/eai6/ai-tutor:${IMAGE_TAG:-latest}
+    # IMAGE_REPO lets a fork deploy the image its own CI publishes; unset, it is
+    # this project's public package.
+    image: ${IMAGE_REPO:-ghcr.io/eai6/ai-tutor}:${IMAGE_TAG:-latest}
     build:
       context: ../..
       dockerfile: Dockerfile

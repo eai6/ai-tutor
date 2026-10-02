@@ -135,3 +135,6 @@ design/student-mastery/student-mastery-by-course.html
 # Per-account CloudFormation parameters (account ids, secret ARNs, emails).
 # The repo is public; commit only the *.example.json files beside the templates.
 infra/aws-ec2/params/
+
+# Server-only Compose override (SES sender and the like); never shared.
+deploy/compose/docker-compose.override.yml

@@ -1,0 +1,244 @@
+# Build once, deploy to a single-server (Path A) AWS account.
+#
+# Accounts are GitHub ENVIRONMENTS, not branches. Every account runs the same
+# code from the same deploy branch; an account differs only in its
+# environment's variables, set from its CloudFormation stack's outputs
+# (infra/aws-ec2/README.md):
+#
+#   AWS_REGION            stack region
+#   AWS_DEPLOY_ROLE_ARN   DeployRoleArn output: assumed over OIDC, no stored keys
+#   EC2_INSTANCE_ID       InstanceId output
+#   SSM_DEPLOY_DOCUMENT   DeployDocumentName output
+#   SITE_HOSTNAME         the DomainName parameter
+#
+# Three ways in:
+#
+#   push to aws_deployment   builds the image; deploys it to the environment
+#                            named in the REPOSITORY variable
+#                            EC2_AUTO_DEPLOY_ENVIRONMENT, if one is set.
+#   push a tag               deploy-ec2/<environment>/<anything> deploys that
+#                            tagged commit to that environment. This is how a
+#                            second account, or a redeploy, is done:
+#                              git tag deploy-ec2/wbank-prod/2026-10-15 <sha>
+#                              git push origin deploy-ec2/wbank-prod/2026-10-15
+#                            deploy-ec2/build/<label> builds only, which is how
+#                            to get an image while a [skip ci] push is needed
+#                            to keep deploy-aws.yml from running.
+#   workflow_dispatch        the same, from the Actions tab. GitHub offers it
+#                            ONLY once this file is on the default branch, and
+#                            a push to main deploys Azure, so until then use
+#                            the tag.
+#
+# An environment's protection rules are where approval lives: give each
+# production environment a required reviewer, and limit it to the deploy
+# branch and deploy-ec2/* tags. Setting those needs repository ADMIN.
+#
+# While the old ECS deployment still exists, deploy-aws.yml ALSO runs on every
+# push to aws_deployment. A commit message containing [skip ci] skips both.
+name: Deploy (EC2)
+
+on:
+  push:
+    branches: [aws_deployment]
+    tags: ['deploy-ec2/**']
+    paths-ignore:
+      # Nothing in these changes what runs in the container. The templates
+      # under infra/ are deployed with CloudFormation by hand, not by this.
+      - 'docs/**'
+      - 'memory/**'
+      - 'infra/**'
+      - '**.md'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: GitHub environment (= AWS account) to deploy to. Empty builds only.
+        type: string
+        default: ''
+      ref:
+        description: Commit or branch to deploy. Empty means the branch this runs on.
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      sha: ${{ steps.target.outputs.sha }}
+      tag: ${{ steps.target.outputs.tag }}
+      image: ${{ steps.target.outputs.image }}
+      environment: ${{ steps.target.outputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+
+      - name: Work out what to deploy, and where
+        id: target
+        env:
+          REF_NAME: ${{ github.ref_name }}
+          REF_TYPE: ${{ github.ref_type }}
+          INPUT_ENV: ${{ inputs.environment }}
+          AUTO_ENV: ${{ vars.EC2_AUTO_DEPLOY_ENVIRONMENT }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          SHA="$(git rev-parse HEAD)"
+          case "$EVENT:$REF_TYPE" in
+            push:tag)
+              # deploy-ec2/<environment>/<label>
+              ENVIRONMENT="$(echo "$REF_NAME" | cut -d/ -f2)"
+              [ -n "$ENVIRONMENT" ] || { echo "::error::Tag $REF_NAME has no environment. Use deploy-ec2/<environment>/<label>."; exit 1; }
+              # deploy-ec2/build/<label> builds the image and deploys nothing.
+              [ "$ENVIRONMENT" != build ] || ENVIRONMENT="" ;;
+            workflow_dispatch:*) ENVIRONMENT="$INPUT_ENV" ;;
+            *) ENVIRONMENT="$AUTO_ENV" ;;
+          esac
+          # The name comes from a tag or an input, and later reaches a shell
+          # and an IAM trust condition: allow only what an environment name needs.
+          if [ -n "$ENVIRONMENT" ] && [[ ! "$ENVIRONMENT" =~ ^[A-Za-z0-9_-]{1,64}$ ]]; then
+            echo "::error::Environment name '$ENVIRONMENT' may use only letters, digits, - and _."
+            exit 1
+          fi
+          IMAGE="ghcr.io/${GITHUB_REPOSITORY,,}"
+          {
+            echo "sha=$SHA"
+            echo "tag=aws-${SHA:0:12}"
+            echo "image=$IMAGE"
+            echo "environment=$ENVIRONMENT"
+          } >> "$GITHUB_OUTPUT"
+          echo "commit $SHA -> $IMAGE:aws-${SHA:0:12} -> environment '${ENVIRONMENT:-none, build only}'"
+
+      - name: Skip the build if this commit's image exists
+        id: exists
+        env:
+          IMAGE: ${{ steps.target.outputs.image }}
+          TAG: ${{ steps.target.outputs.tag }}
+        run: |
+          if docker manifest inspect "$IMAGE:$TAG" >/dev/null 2>&1; then
+            echo "found=true" >> "$GITHUB_OUTPUT"; echo "$IMAGE:$TAG already published"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Free runner disk space
+        if: steps.exists.outputs.found != 'true'
+        # The image is ~7 GB; the hosted runner has no room for it alongside
+        # the preinstalled Android SDK.
+        run: sudo rm -rf /usr/local/lib/android && df -h /
+
+      - uses: docker/login-action@v3
+        if: steps.exists.outputs.found != 'true'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/setup-buildx-action@v3
+        if: steps.exists.outputs.found != 'true'
+
+      - name: Build and push
+        if: steps.exists.outputs.found != 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          # The servers are x86_64 (the template allows only x86 instance types).
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.target.outputs.image }}:${{ steps.target.outputs.tag }}
+          labels: |
+            org.opencontainers.image.revision=${{ steps.target.outputs.sha }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Check servers can pull it without credentials
+        # A package GitHub has just created is PRIVATE. The servers pull
+        # anonymously, so a private package fails every deploy with "denied".
+        # Make it public once in the package's settings.
+        env:
+          IMAGE: ${{ steps.target.outputs.image }}
+          TAG: ${{ steps.target.outputs.tag }}
+        run: |
+          REPO="${IMAGE#ghcr.io/}"
+          TOKEN="$(curl -fsS "https://ghcr.io/token?scope=repository:$REPO:pull" | jq -r .token)"
+          CODE="$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $TOKEN" \
+            -H 'Accept: application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.v2+json' \
+            "https://ghcr.io/v2/$REPO/manifests/$TAG")"
+          if [ "$CODE" != 200 ]; then
+            echo "::error::Anonymous pull of $IMAGE:$TAG answered $CODE. Make the GHCR package public, or servers cannot pull it."
+            exit 1
+          fi
+          echo "anonymous pull OK"
+
+  deploy:
+    needs: build
+    if: needs.build.outputs.environment != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    environment:
+      name: ${{ needs.build.outputs.environment }}
+      url: https://${{ vars.SITE_HOSTNAME }}
+    # One deploy at a time per account; a second waits rather than racing.
+    concurrency:
+      group: deploy-ec2-${{ needs.build.outputs.environment }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      SHA: ${{ needs.build.outputs.sha }}
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      INSTANCE: ${{ vars.EC2_INSTANCE_ID }}
+      DOCUMENT: ${{ vars.SSM_DEPLOY_DOCUMENT }}
+      SITE: ${{ vars.SITE_HOSTNAME }}
+    steps:
+      - name: Check the environment is configured
+        env:
+          ROLE: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          TARGET: ${{ needs.build.outputs.environment }}
+        run: |
+          missing=""
+          for v in AWS_REGION ROLE INSTANCE DOCUMENT SITE; do [ -n "${!v}" ] || missing="$missing $v"; done
+          if [ -n "$missing" ]; then
+            echo "::error::Environment '$TARGET' is missing variables:$missing. Set them from the stack outputs (infra/aws-ec2/README.md)."
+            exit 1
+          fi
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+          role-session-name: deploy-ec2-${{ github.run_id }}
+
+      - name: Deploy on the server over SSM
+        env:
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          CMD_ID="$(aws ssm send-command --instance-ids "$INSTANCE" --document-name "$DOCUMENT" \
+            --parameters "CommitSha=$SHA" --comment "deploy ${SHA:0:12} run $RUN_ID" \
+            --query Command.CommandId --output text)"
+          echo "SSM command $CMD_ID"
+          # Up to an hour: backup, pull, migrations and the first-start index
+          # build all happen inside it.
+          for i in $(seq 1 240); do
+            sleep 15
+            STATUS="$(aws ssm get-command-invocation --command-id "$CMD_ID" --instance-id "$INSTANCE" \
+              --query Status --output text 2>/dev/null || echo Pending)"
+            case "$STATUS" in Pending|InProgress|Delayed) continue ;; *) break ;; esac
+          done
+          aws ssm get-command-invocation --command-id "$CMD_ID" --instance-id "$INSTANCE" \
+            --query '[StandardOutputContent, StandardErrorContent]' --output text || true
+          echo "status: $STATUS (full log on the server: /var/log/aitutor-deploy.log)"
+          [ "$STATUS" = Success ]
+
+      - name: Check the site from outside
+        run: |
+          BODY="$(curl -fsS --max-time 20 "https://$SITE/health/")"
+          echo "$BODY"
+          echo "$BODY" | grep -q '"status": *"ok"'

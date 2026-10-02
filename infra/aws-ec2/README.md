@@ -4,7 +4,7 @@ Two templates stand up the AWS side of a Path A deployment in any account:
 
 | Template | Stack | Region | Creates |
 | --- | --- | --- | --- |
-| `aitutor-ec2.yaml` | `<prefix>-prod` | Where the server runs | Instance (first-boot setup included), Elastic IP, security group, instance role, backup bucket, DNS A record, optional SES identity with DKIM and DMARC records, SNS alert topic, 4 alarms, Route 53 health check, daily EBS snapshots |
+| `aitutor-ec2.yaml` | `<prefix>-prod` | Where the server runs | Instance (first-boot setup included), Elastic IP, security group, instance role, backup bucket, DNS A record, optional SES identity with DKIM and DMARC records, SNS alert topic, 4 alarms, Route 53 health check, daily EBS snapshots, the deploy SSM document, and optionally GitHub's OIDC provider and a deploy role |
 | `aitutor-budget.yaml` | `<prefix>-budget` | `us-east-1` | Monthly AWS spend budget with email alerts |
 
 The budget is separate because CloudFormation cannot create `AWS::Budgets::Budget`
@@ -91,6 +91,68 @@ After the stack completes:
 4. The **site-down alarm** fires until the app is up in phase 5. That is expected.
    It exists only in `us-east-1` stacks, because Route 53 publishes health-check
    metrics nowhere else. Elsewhere, create it by hand in `us-east-1`.
+
+## Continuous deployment
+
+Accounts map to **GitHub environments**, not branches. Every account runs the
+same code from one deploy branch (`aws_deployment`), and CI builds each
+commit's image once, as `ghcr.io/<owner>/<repo>:aws-<first 12 of the SHA>`.
+An account differs only in its environment's variables.
+`.github/workflows/deploy-ec2.yml` explains the triggers; in short:
+
+| To | Do |
+| --- | --- |
+| Build an image without deploying | Push to `aws_deployment`, or push a `deploy-ec2/build/<label>` tag |
+| Deploy every push to one account | Set the **repository** variable `EC2_AUTO_DEPLOY_ENVIRONMENT` to that environment |
+| Deploy a commit to any account | `git tag deploy-ec2/<environment>/<label> <sha> && git push origin <that tag>` |
+| Redeploy or roll forward by hand | `aws ssm send-command --document-name <DeployDocumentName> --instance-ids <InstanceId> --parameters CommitSha=<full sha>` |
+
+A deploy runs `deploy/compose/deploy.sh` on the server over SSM. It pulls the
+image, checks for pending migrations, backs up to S3, switches, and waits for
+`/health/`. A failed start rolls back by itself only when no migration ran.
+After a migration, it alerts and leaves the restore to a person, because
+Django does not reverse migrations.
+
+### One-time setup per account
+
+1. Deploy the stack with `GitHubRepository` and `GitHubEnvironment` set. The
+   template creates the OIDC provider (set `CreateGitHubOidcProvider=false` if
+   `aws iam list-open-id-connect-providers` already lists
+   `token.actions.githubusercontent.com`) and a deploy role. That role can do
+   one thing: run the `<prefix>-deploy` SSM document on this server.
+2. In GitHub (**needs repository admin**), create the environment and set its
+   variables from the stack outputs:
+
+   | Variable | Value |
+   | --- | --- |
+   | `AWS_REGION` | Stack region |
+   | `AWS_DEPLOY_ROLE_ARN` | `DeployRoleArn` output |
+   | `EC2_INSTANCE_ID` | `InstanceId` output |
+   | `SSM_DEPLOY_DOCUMENT` | `DeployDocumentName` output |
+   | `SITE_HOSTNAME` | `DomainName` parameter |
+
+   Then give it protection rules: a required reviewer, and deployment
+   branches and tags limited to `aws_deployment` and `deploy-ec2/*`. The
+   deploy role trusts only jobs running in this environment, so these rules
+   gate every deploy.
+3. The first deploy is by hand (runbook phases 3 to 5), because `.env` and the
+   data restore must exist before `deploy.sh` can run. CI takes over after that.
+
+### Gotchas
+
+- **Manual runs need the default branch.** GitHub shows "Run workflow" only
+  for workflow files on the default branch (`main`), and a push to `main`
+  deploys the Azure production stack. Use a `deploy-ec2/...` tag until the
+  workflow is on `main`.
+- **A new GHCR package is private.** Servers pull without credentials, so a
+  fork's first image fails every deploy with `denied` until the package is
+  made public. The workflow checks this and says so. A fork also sets
+  `IMAGE_REPO=ghcr.io/<owner>/<repo>` in the server's `.env`.
+- **`[skip ci]` skips every workflow.** While another workflow also runs on
+  pushes to `aws_deployment`, a commit that must not trigger it carries
+  `[skip ci]`, and then this one does not build either.
+- **Files under `infra/`, `docs/` and `memory/`, and `*.md` files, do not trigger a build.**
+  Template changes go through a CloudFormation change set, by hand.
 
 ## Updating
 

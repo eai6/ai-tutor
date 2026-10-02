@@ -25,6 +25,8 @@ Metadata:
         Parameters: [SecretArns, SecretsKmsKeyArn]
       - Label: {default: Operations}
         Parameters: [AlertEmail, DiskAlarmPercent, SnapshotRetainCount, BackupRetentionDays]
+      - Label: {default: Continuous deployment}
+        Parameters: [GitHubRepository, GitHubEnvironment, CreateGitHubOidcProvider]
 
 Parameters:
   Prefix:
@@ -117,6 +119,36 @@ Parameters:
     MinValue: 7
     Description: Days before backups (and their noncurrent versions) expire from the bucket.
 
+  GitHubRepository:
+    Type: String
+    Default: ""
+    AllowedPattern: "^$|^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+    Description: >-
+      owner/repo whose GitHub Actions may deploy to this server (.github/workflows/deploy-ec2.yml).
+      Empty creates no deploy role; deploys are then run by hand.
+  GitHubEnvironment:
+    Type: String
+    Default: ""
+    AllowedPattern: "^$|^[A-Za-z0-9_-]{1,64}$"
+    Description: >-
+      The GitHub environment that stands for this account, e.g. wbank-prod. Only jobs
+      running in it can assume the deploy role.
+  CreateGitHubOidcProvider:
+    Type: String
+    Default: "true"
+    AllowedValues: ["true", "false"]
+    Description: >-
+      An account holds ONE provider for token.actions.githubusercontent.com. "false"
+      when another stack or person already created it; check with
+      aws iam list-open-id-connect-providers.
+
+Rules:
+  EnvironmentWithRepository:
+    RuleCondition: !Not [!Equals [!Ref GitHubRepository, ""]]
+    Assertions:
+      - Assert: !Not [!Equals [!Ref GitHubEnvironment, ""]]
+        AssertDescription: GitHubEnvironment is required when GitHubRepository is set.
+
 Conditions:
   ManageDns: !Not [!Equals [!Ref HostedZoneId, ""]]
   SesIdentity: !Equals [!Ref CreateSesIdentity, "true"]
@@ -125,6 +157,8 @@ Conditions:
   # Route 53 publishes health-check metrics to us-east-1 only, so the
   # site-down alarm can exist only in a stack deployed there.
   InUsEast1: !Equals [!Ref "AWS::Region", us-east-1]
+  GitHubDeploy: !Not [!Equals [!Ref GitHubRepository, ""]]
+  CreateOidcProvider: !And [!Condition GitHubDeploy, !Equals [!Ref CreateGitHubOidcProvider, "true"]]
 
 Resources:
 
@@ -307,9 +341,21 @@ Resources:
           export DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a
           APT="apt-get -y -o DPkg::Lock::Timeout=600"
 
+          # What deploy/compose/deploy.sh and backup-to-s3.sh need to know
+          # about this account. Written first, so it exists even if a later
+          # step fails.
+          install -d -m 0755 /etc/aitutor
+          cat > /etc/aitutor/aitutor.env <<'EOF'
+          # Written at first boot by CloudFormation stack ${AWS::StackName}.
+          AWS_REGION=${AWS::Region}
+          BACKUP_BUCKET=${BackupBucket}
+          ALERT_TOPIC_ARN=${AlertTopic}
+          SITE_HOSTNAME=${DomainName}
+          EOF
+
           # Outbound network can lag the first seconds of boot while the
           # Elastic IP attaches.
-          for i in $(seq 1 30); do curl -fsS -o /dev/null https://download.docker.com && break; sleep 10; done
+          for _ in $(seq 1 30); do curl -fsS -o /dev/null https://download.docker.com && break; sleep 10; done
 
           $APT update
           $APT full-upgrade
@@ -548,6 +594,100 @@ Resources:
       AlarmActions: [!Ref AlertTopic]
       OKActions: [!Ref AlertTopic]
 
+  # --- Deployment ----------------------------------------------------------
+
+  # The only thing CI can ask the server to do: deploy one commit. The commit
+  # is a parameter checked against a full SHA, so the role that sends this
+  # cannot run arbitrary commands. Also usable by hand from the SSM console.
+  DeployDocument:
+    Type: AWS::SSM::Document
+    Properties:
+      Name: !Sub ${Prefix}-deploy
+      DocumentType: Command
+      DocumentFormat: YAML
+      # A change makes a new version and sets it as default, so the name the
+      # GitHub environment holds never changes.
+      UpdateMethod: NewVersion
+      Content:
+        schemaVersion: "2.2"
+        description: >-
+          Deploy one commit of AI Tutor: check it out in /opt/ai-tutor and run
+          deploy/compose/deploy.sh, which backs up, pulls the image CI built,
+          switches and verifies. Logs to /var/log/aitutor-deploy.log.
+        parameters:
+          CommitSha:
+            type: String
+            description: Full 40-character commit SHA. CI must have built aws-<first 12> for it.
+            allowedPattern: "^[0-9a-f]{40}$"
+        mainSteps:
+          - action: aws:runShellScript
+            name: deploy
+            inputs:
+              timeoutSeconds: "3600"
+              # Plain sh, so no pipefail. SSM runs as root with HOME unset,
+              # which git and docker both want.
+              runCommand:
+                - set -eu
+                - export HOME=/root
+                - cd /opt/ai-tutor
+                - git -c safe.directory=/opt/ai-tutor fetch --quiet origin '{{ CommitSha }}'
+                - git -c safe.directory=/opt/ai-tutor -c advice.detachedHead=false checkout --quiet --detach '{{ CommitSha }}'
+                - deploy/compose/deploy.sh '{{ CommitSha }}'
+      Tags:
+        - {Key: Project, Value: !Ref ProjectTag}
+
+  GitHubOidcProvider:
+    Type: AWS::IAM::OIDCProvider
+    Condition: CreateOidcProvider
+    Properties:
+      Url: https://token.actions.githubusercontent.com
+      ClientIdList: [sts.amazonaws.com]
+      Tags:
+        - {Key: Project, Value: !Ref ProjectTag}
+
+  DeployRole:
+    Type: AWS::IAM::Role
+    Condition: GitHubDeploy
+    Properties:
+      RoleName: !Sub ${Prefix}-github-deploy
+      Description: !Sub GitHub Actions deploys from ${GitHubRepository}, environment ${GitHubEnvironment}, and nothing else.
+      MaxSessionDuration: 7200
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !If
+                - CreateOidcProvider
+                - !Ref GitHubOidcProvider
+                - !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+                # A job gets this subject only when it runs in that
+                # environment, so the environment's protection rules (required
+                # reviewers, allowed branches and tags) gate every deploy.
+                token.actions.githubusercontent.com:sub: !Sub repo:${GitHubRepository}:environment:${GitHubEnvironment}
+      Policies:
+        - PolicyName: send-deploy-command
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: RunTheDeployDocumentOnThisServerOnly
+                Effect: Allow
+                Action: ssm:SendCommand
+                Resource:
+                  - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:document/${DeployDocument}
+                  - !Sub arn:${AWS::Partition}:ec2:${AWS::Region}:${AWS::AccountId}:instance/${Server}
+              - Sid: ReadTheResult
+                Effect: Allow
+                # GetCommandInvocation has no resource-level permissions.
+                Action: ssm:GetCommandInvocation
+                Resource: "*"
+      Tags:
+        - {Key: Project, Value: !Ref ProjectTag}
+
   # --- Snapshots ---------------------------------------------------------
 
   SnapshotRole:
@@ -611,3 +751,10 @@ Outputs:
     Value: !GetAtt InstanceRole.Arn
   HealthCheckId:
     Value: !Ref SiteHealthCheck
+  DeployDocumentName:
+    Description: GitHub environment variable SSM_DEPLOY_DOCUMENT.
+    Value: !Ref DeployDocument
+  DeployRoleArn:
+    Condition: GitHubDeploy
+    Description: GitHub environment variable AWS_DEPLOY_ROLE_ARN.
+    Value: !GetAtt DeployRole.Arn

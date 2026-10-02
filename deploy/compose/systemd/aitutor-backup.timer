@@ -1,0 +1,11 @@
+# 02:00 server time (UTC on the stack's Ubuntu image), ahead of the 05:00 UTC
+# EBS snapshot. Persistent: a run missed while the server was off happens at boot.
+[Unit]
+Description=AI Tutor nightly backup to S3
+
+[Timer]
+OnCalendar=*-*-* 02:00:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
