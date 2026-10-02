@@ -1,0 +1,68 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  AI Tutor monthly AWS spend alert. One stack per account, deployed in
+  us-east-1: budgets are account-wide, and CloudFormation cannot create them
+  in every region (af-south-1, for one), so this stays out of aitutor-ec2.yaml.
+
+Parameters:
+  Prefix:
+    Type: String
+    Default: aitutor
+    AllowedPattern: "^[a-z][a-z0-9-]{1,24}$"
+    Description: Same prefix as the server stack.
+  ProjectTag:
+    Type: String
+    Default: ai-tutor
+    Description: Same Project tag value as the server stack.
+  AlertEmail:
+    Type: String
+    AllowedPattern: "^[^@\\s]+@[^@\\s]+$"
+    Description: Receives the budget emails.
+  MonthlyBudgetUsd:
+    Type: Number
+    Default: 200
+    Description: AWS spend that triggers an email. LLM provider bills are not AWS spend.
+  BudgetScope:
+    Type: String
+    Default: project-tag
+    AllowedValues: [project-tag, account]
+    Description: >-
+      project-tag counts only resources tagged Project=ProjectTag. It needs
+      Project activated as a cost allocation tag in Billing, or the budget
+      reads $0 and never fires. account counts everything in the account.
+
+Conditions:
+  BudgetByTag: !Equals [!Ref BudgetScope, project-tag]
+
+Resources:
+  SpendBudget:
+    Type: AWS::Budgets::Budget
+    Properties:
+      Budget:
+        BudgetName: !Sub ${Prefix}-monthly
+        BudgetType: COST
+        TimeUnit: MONTHLY
+        BudgetLimit:
+          Amount: !Ref MonthlyBudgetUsd
+          Unit: USD
+        CostFilters: !If
+          - BudgetByTag
+          - TagKeyValue: [!Sub "user:Project$${ProjectTag}"]
+          - !Ref AWS::NoValue
+      NotificationsWithSubscribers:
+        - Notification:
+            NotificationType: ACTUAL
+            ComparisonOperator: GREATER_THAN
+            Threshold: 100
+            ThresholdType: PERCENTAGE
+          Subscribers: [{SubscriptionType: EMAIL, Address: !Ref AlertEmail}]
+        - Notification:
+            NotificationType: FORECASTED
+            ComparisonOperator: GREATER_THAN
+            Threshold: 100
+            ThresholdType: PERCENTAGE
+          Subscribers: [{SubscriptionType: EMAIL, Address: !Ref AlertEmail}]
+
+Outputs:
+  BudgetName:
+    Value: !Ref SpendBudget

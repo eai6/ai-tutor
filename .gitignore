@@ -131,3 +131,7 @@ offline_eval/multi_turn_results/**/*.log
 # Seeded design-canvas payload — 2.5 MB of editor code, regenerated from the
 # .dc.html working files beside it. Publish comes from the working files.
 design/student-mastery/student-mastery-by-course.html
+
+# Per-account CloudFormation parameters (account ids, secret ARNs, emails).
+# The repo is public; commit only the *.example.json files beside the templates.
+infra/aws-ec2/params/

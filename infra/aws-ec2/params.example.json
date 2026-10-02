@@ -1,0 +1,19 @@
+[
+  {"ParameterKey": "Prefix", "ParameterValue": "aitutor"},
+  {"ParameterKey": "ProjectTag", "ParameterValue": "ai-tutor"},
+  {"ParameterKey": "AmiId", "ParameterValue": "ami-REPLACE-pinned-ubuntu-24.04"},
+  {"ParameterKey": "InstanceType", "ParameterValue": "m7i-flex.xlarge"},
+  {"ParameterKey": "RootVolumeGiB", "ParameterValue": "100"},
+  {"ParameterKey": "SwapGiB", "ParameterValue": "4"},
+  {"ParameterKey": "VpcId", "ParameterValue": "vpc-REPLACE"},
+  {"ParameterKey": "SubnetId", "ParameterValue": "subnet-REPLACE"},
+  {"ParameterKey": "DomainName", "ParameterValue": "aitutor.example.org"},
+  {"ParameterKey": "HostedZoneId", "ParameterValue": "ZREPLACE"},
+  {"ParameterKey": "CreateSesIdentity", "ParameterValue": "true"},
+  {"ParameterKey": "SecretArns", "ParameterValue": "arn:aws:secretsmanager:REGION:ACCOUNT:secret:NAME-SUFFIX,arn:aws:secretsmanager:REGION:ACCOUNT:secret:NAME2-SUFFIX"},
+  {"ParameterKey": "SecretsKmsKeyArn", "ParameterValue": ""},
+  {"ParameterKey": "AlertEmail", "ParameterValue": "ops@example.org"},
+  {"ParameterKey": "DiskAlarmPercent", "ParameterValue": "80"},
+  {"ParameterKey": "SnapshotRetainCount", "ParameterValue": "7"},
+  {"ParameterKey": "BackupRetentionDays", "ParameterValue": "90"}
+]

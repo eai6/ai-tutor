@@ -1,0 +1,7 @@
+[
+  {"ParameterKey": "Prefix", "ParameterValue": "aitutor"},
+  {"ParameterKey": "ProjectTag", "ParameterValue": "ai-tutor"},
+  {"ParameterKey": "AlertEmail", "ParameterValue": "ops@example.org"},
+  {"ParameterKey": "MonthlyBudgetUsd", "ParameterValue": "200"},
+  {"ParameterKey": "BudgetScope", "ParameterValue": "project-tag"}
+]

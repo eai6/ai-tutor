@@ -1,0 +1,613 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  AI Tutor, Path A: one EC2 instance running the Docker Compose stack
+  (app, Postgres + pgvector, Caddy), with its backup bucket, instance role,
+  DNS, SES identity, alarms and daily snapshots. The spend budget is a
+  separate stack (aitutor-budget.yaml) because Budgets is not available to
+  CloudFormation in every region. Builds nothing from
+  the repo: the image build, configuration and data restore stay in the
+  runbook (phases 3-5). See README.md beside this file.
+
+# Every value that differs between AWS accounts is a parameter; nothing below
+# names an account, domain or secret. Secrets are referenced by ARN and never
+# created here, so their values never pass through CloudFormation.
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label: {default: Naming}
+        Parameters: [Prefix, ProjectTag]
+      - Label: {default: Server}
+        Parameters: [AmiId, InstanceType, RootVolumeGiB, SwapGiB, VpcId, SubnetId]
+      - Label: {default: Domain and mail}
+        Parameters: [DomainName, HostedZoneId, CreateSesIdentity]
+      - Label: {default: Secrets}
+        Parameters: [SecretArns, SecretsKmsKeyArn]
+      - Label: {default: Operations}
+        Parameters: [AlertEmail, DiskAlarmPercent, SnapshotRetainCount, BackupRetentionDays]
+
+Parameters:
+  Prefix:
+    Type: String
+    Default: aitutor
+    AllowedPattern: "^[a-z][a-z0-9-]{1,24}$"
+    Description: >-
+      Starts every resource name (PREFIX-prod, PREFIX-ec2, PREFIX-backups-ACCOUNT).
+      Use a different prefix for a second deployment in the same account.
+  ProjectTag:
+    Type: String
+    Default: ai-tutor
+    Description: Value of the Project tag on every resource. aitutor-budget.yaml filters on it.
+
+  AmiId:
+    Type: AWS::EC2::Image::Id
+    Description: >-
+      Ubuntu 24.04 LTS amd64 AMI, PINNED. Resolve it once with
+      aws ssm get-parameter --name /aws/service/canonical/ubuntu/server/24.04/stable/current/amd64/hvm/ebs-gp3/ami-id
+      and keep it fixed: a new AMI id on a stack update replaces the instance.
+  InstanceType:
+    Type: String
+    Default: m7i-flex.xlarge
+    AllowedValues: [m7i-flex.xlarge, m7i.xlarge, t3.xlarge, m6i.xlarge, m7i-flex.2xlarge, m7i.2xlarge]
+    Description: x86_64 only, 16 GiB or more. Changing it on a running stack stops and starts the instance.
+  RootVolumeGiB:
+    Type: Number
+    Default: 100
+    MinValue: 60
+    Description: gp3 root volume. Holds the ~7 GB image, its build cache, Postgres and media.
+  SwapGiB:
+    Type: Number
+    Default: 4
+    MinValue: 0
+    Description: Swap file created at first boot, a cushion for the image build. 0 for none.
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: VPC for the instance; the account's default VPC is fine.
+  SubnetId:
+    Type: AWS::EC2::Subnet::Id
+    Description: >-
+      A public subnet of that VPC, in an Availability Zone that offers the
+      instance type (us-east-1e does not offer m7i-flex).
+
+  DomainName:
+    Type: String
+    AllowedPattern: "^[a-z0-9.-]+$"
+    Description: Hostname students use, e.g. aitutor.example.org. Also the SES sending domain.
+  HostedZoneId:
+    Type: String
+    Default: ""
+    Description: >-
+      Route 53 hosted zone in THIS account that holds DomainName. Empty when the
+      zone lives elsewhere: then create the A record by hand from the PublicIp output.
+  CreateSesIdentity:
+    Type: String
+    Default: "true"
+    AllowedValues: ["true", "false"]
+    Description: >-
+      Create the SES domain identity with Easy DKIM, plus its DKIM and DMARC
+      records when HostedZoneId is set. "false" when the identity already exists.
+
+  SecretArns:
+    Type: CommaDelimitedList
+    Description: >-
+      Full ARNs of the Secrets Manager secrets the server may read (LLM API keys),
+      comma-separated, including the random suffix.
+  SecretsKmsKeyArn:
+    Type: String
+    Default: ""
+    Description: Customer-managed KMS key those secrets use. Empty for the default aws/secretsmanager key.
+
+  AlertEmail:
+    Type: String
+    AllowedPattern: "^[^@\\s]+@[^@\\s]+$"
+    Description: Receives alarms. Confirm the SNS email after the stack is created.
+  DiskAlarmPercent:
+    Type: Number
+    Default: 80
+    MinValue: 50
+    MaxValue: 95
+  SnapshotRetainCount:
+    Type: Number
+    Default: 7
+    MinValue: 1
+    Description: Daily root-volume snapshots to keep.
+  BackupRetentionDays:
+    Type: Number
+    Default: 90
+    MinValue: 7
+    Description: Days before backups (and their noncurrent versions) expire from the bucket.
+
+Conditions:
+  ManageDns: !Not [!Equals [!Ref HostedZoneId, ""]]
+  SesIdentity: !Equals [!Ref CreateSesIdentity, "true"]
+  SesDnsRecords: !And [!Condition ManageDns, !Condition SesIdentity]
+  HasKmsKey: !Not [!Equals [!Ref SecretsKmsKeyArn, ""]]
+  # Route 53 publishes health-check metrics to us-east-1 only, so the
+  # site-down alarm can exist only in a stack deployed there.
+  InUsEast1: !Equals [!Ref "AWS::Region", us-east-1]
+
+Resources:
+
+  # --- Backups ---------------------------------------------------------------
+
+  BackupBucket:
+    Type: AWS::S3::Bucket
+    # Holds the only off-server copy of the database. Survives a stack delete.
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !Sub ${Prefix}-backups-${AWS::AccountId}
+      VersioningConfiguration: {Status: Enabled}
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault: {SSEAlgorithm: AES256}
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      OwnershipControls:
+        Rules: [{ObjectOwnership: BucketOwnerEnforced}]
+      LifecycleConfiguration:
+        Rules:
+          - Id: expire-backups
+            Status: Enabled
+            ExpirationInDays: !Ref BackupRetentionDays
+            NoncurrentVersionExpiration: {NoncurrentDays: !Ref BackupRetentionDays}
+            AbortIncompleteMultipartUpload: {DaysAfterInitiation: 7}
+      Tags:
+        - {Key: Project, Value: !Ref ProjectTag}
+
+  BackupBucketTlsOnly:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref BackupBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: "*"
+            Action: "s3:*"
+            Resource:
+              - !GetAtt BackupBucket.Arn
+              - !Sub ${BackupBucket.Arn}/*
+            Condition: {Bool: {"aws:SecureTransport": "false"}}
+
+  # --- Identity --------------------------------------------------------------
+
+  InstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${Prefix}-ec2
+      Description: AI Tutor server. Writes backups, reads its imports and LLM keys, sends mail.
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: {Service: ec2.amazonaws.com}
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub arn:${AWS::Partition}:iam::aws:policy/AmazonSSMManagedInstanceCore
+        - !Sub arn:${AWS::Partition}:iam::aws:policy/CloudWatchAgentServerPolicy
+      Policies:
+        - PolicyName: aitutor-server
+          PolicyDocument:
+            Version: "2012-10-17"
+            # Write-only to daily/ and read-only from imports/: a compromised
+            # server can neither read old backups nor delete any.
+            Statement:
+              - Sid: WriteNightlyBackups
+                Effect: Allow
+                Action: s3:PutObject
+                Resource: !Sub ${BackupBucket.Arn}/daily/*
+              - Sid: ReadImports
+                Effect: Allow
+                Action: s3:GetObject
+                Resource: !Sub ${BackupBucket.Arn}/imports/*
+              - Sid: ReadLlmKeys
+                Effect: Allow
+                Action: secretsmanager:GetSecretValue
+                Resource: !Ref SecretArns
+              - !If
+                - HasKmsKey
+                - Sid: DecryptLlmKeys
+                  Effect: Allow
+                  Action: kms:Decrypt
+                  Resource: !Ref SecretsKmsKeyArn
+                  Condition:
+                    StringEquals:
+                      kms:ViaService: !Sub secretsmanager.${AWS::Region}.amazonaws.com
+                - !Ref AWS::NoValue
+              - Sid: SendMail
+                Effect: Allow
+                Action: [ses:SendEmail, ses:SendRawEmail]
+                Resource: !Sub arn:${AWS::Partition}:ses:${AWS::Region}:${AWS::AccountId}:identity/${DomainName}
+              - Sid: AlertOnFailedBackup
+                Effect: Allow
+                Action: sns:Publish
+                Resource: !Ref AlertTopic
+      Tags:
+        - {Key: Project, Value: !Ref ProjectTag}
+
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: !Sub ${Prefix}-ec2
+      Roles: [!Ref InstanceRole]
+
+  # --- Network ---------------------------------------------------------------
+
+  WebSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub ${Prefix}-web
+      GroupDescription: HTTP and HTTPS to Caddy. No SSH; admins use SSM Session Manager.
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - {IpProtocol: tcp, FromPort: 80, ToPort: 80, CidrIp: 0.0.0.0/0}
+        - {IpProtocol: tcp, FromPort: 443, ToPort: 443, CidrIp: 0.0.0.0/0}
+        - {IpProtocol: tcp, FromPort: 80, ToPort: 80, CidrIpv6: "::/0"}
+        - {IpProtocol: tcp, FromPort: 443, ToPort: 443, CidrIpv6: "::/0"}
+      Tags:
+        - {Key: Name, Value: !Sub "${Prefix}-web"}
+        - {Key: Project, Value: !Ref ProjectTag}
+
+  # --- Server ----------------------------------------------------------------
+
+  # Only for the metadata options: IMDSv2 required, hop limit 2 so the app
+  # container (one hop behind the host) can reach the instance role for SES.
+  ServerLaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateName: !Sub ${Prefix}-server
+      LaunchTemplateData:
+        MetadataOptions:
+          HttpEndpoint: enabled
+          HttpTokens: required
+          HttpPutResponseHopLimit: 2
+
+  Server:
+    Type: AWS::EC2::Instance
+    # Postgres and media live on the root volume. If a stack update ever tries
+    # to replace the instance, keep the old one rather than delete its data.
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LaunchTemplate:
+        LaunchTemplateId: !Ref ServerLaunchTemplate
+        Version: !GetAtt ServerLaunchTemplate.LatestVersionNumber
+      ImageId: !Ref AmiId
+      InstanceType: !Ref InstanceType
+      SubnetId: !Ref SubnetId
+      SecurityGroupIds: [!Ref WebSecurityGroup]
+      IamInstanceProfile: !Ref InstanceProfile
+      DisableApiTermination: true
+      BlockDeviceMappings:
+        - DeviceName: /dev/sda1
+          Ebs:
+            VolumeSize: !Ref RootVolumeGiB
+            VolumeType: gp3
+            Encrypted: true
+            DeleteOnTermination: true
+      PropagateTagsToVolumeOnCreation: true
+      Tags:
+        - {Key: Name, Value: !Sub "${Prefix}-prod"}
+        - {Key: Project, Value: !Ref ProjectTag}
+        # The snapshot policy targets this tag, so nothing else in the
+        # account is swept into it.
+        - {Key: !Sub "${Prefix}-snapshot", Value: daily}
+      # Phase 2 of the runbook. Runs once, at first boot. Editing it on a
+      # running stack stops and starts the instance and does NOT re-run it.
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          set -euxo pipefail
+          exec > >(tee -a /var/log/aitutor-bootstrap.log) 2>&1
+          export DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a
+          APT="apt-get -y -o DPkg::Lock::Timeout=600"
+
+          # Outbound network can lag the first seconds of boot while the
+          # Elastic IP attaches.
+          for i in $(seq 1 30); do curl -fsS -o /dev/null https://download.docker.com && break; sleep 10; done
+
+          $APT update
+          $APT full-upgrade
+          $APT install unattended-upgrades git ca-certificates curl unzip jq
+
+          # Security updates install nightly and reboot at 03:30 when needed;
+          # the containers come back on their own (restart: unless-stopped).
+          cat > /etc/apt/apt.conf.d/52aitutor-reboot <<'EOF'
+          Unattended-Upgrade::Automatic-Reboot "true";
+          Unattended-Upgrade::Automatic-Reboot-Time "03:30";
+          EOF
+          systemctl enable --now unattended-upgrades
+
+          # Docker Engine and the Compose plugin from Docker's repository,
+          # not Ubuntu's docker.io.
+          install -m 0755 -d /etc/apt/keyrings
+          curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+          chmod a+r /etc/apt/keyrings/docker.asc
+          . /etc/os-release
+          echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu ${!VERSION_CODENAME} stable" \
+            > /etc/apt/sources.list.d/docker.list
+          $APT update
+          $APT install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+          # Without a cap, gunicorn access logs grow until the disk fills.
+          cat > /etc/docker/daemon.json <<'EOF'
+          {"log-driver": "json-file", "log-opts": {"max-size": "50m", "max-file": "5"}}
+          EOF
+          systemctl restart docker
+
+          if [ "${SwapGiB}" -gt 0 ] && [ ! -f /swapfile ]; then
+            fallocate -l ${SwapGiB}G /swapfile
+            chmod 600 /swapfile
+            mkswap /swapfile
+            swapon /swapfile
+            echo '/swapfile none swap sw 0 0' >> /etc/fstab
+          fi
+
+          # AWS CLI v2: the nightly backup uploads with the instance role.
+          curl -fsSL https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip -o /tmp/awscliv2.zip
+          unzip -q -o /tmp/awscliv2.zip -d /tmp
+          /tmp/aws/install --update
+          rm -rf /tmp/aws /tmp/awscliv2.zip
+
+          # CloudWatch agent, for the disk alarm: disk_used_percent on /,
+          # published with exactly the InstanceId and path dimensions.
+          curl -fsSL https://amazoncloudwatch-agent.s3.amazonaws.com/ubuntu/amd64/latest/amazon-cloudwatch-agent.deb -o /tmp/cwagent.deb
+          dpkg -i /tmp/cwagent.deb
+          rm /tmp/cwagent.deb
+          cat > /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json <<'EOF'
+          {
+            "agent": {"metrics_collection_interval": 300},
+            "metrics": {
+              "append_dimensions": {"InstanceId": "${!aws:InstanceId}"},
+              "aggregation_dimensions": [["InstanceId", "path"]],
+              "metrics_collected": {
+                "disk": {"resources": ["/"], "measurement": ["used_percent"], "drop_device": true}
+              }
+            }
+          }
+          EOF
+          /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -s \
+            -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json
+
+          date -u +%FT%TZ > /var/lib/aitutor-bootstrap.done
+          # A kernel from full-upgrade takes effect now, before any app is on the box.
+          if [ -f /var/run/reboot-required ]; then reboot; fi
+
+  PublicIp:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+      InstanceId: !Ref Server
+      Tags:
+        - {Key: Name, Value: !Sub "${Prefix}-prod"}
+        - {Key: Project, Value: !Ref ProjectTag}
+
+  # --- DNS and mail ----------------------------------------------------------
+
+  SiteRecord:
+    Type: AWS::Route53::RecordSet
+    Condition: ManageDns
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !Ref DomainName
+      Type: A
+      TTL: "300"
+      ResourceRecords: [!Ref PublicIp]
+
+  MailIdentity:
+    Type: AWS::SES::EmailIdentity
+    Condition: SesIdentity
+    Properties:
+      EmailIdentity: !Ref DomainName
+
+  DkimRecord1:
+    Type: AWS::Route53::RecordSet
+    Condition: SesDnsRecords
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !GetAtt MailIdentity.DkimDNSTokenName1
+      Type: CNAME
+      TTL: "1800"
+      ResourceRecords: [!GetAtt MailIdentity.DkimDNSTokenValue1]
+
+  DkimRecord2:
+    Type: AWS::Route53::RecordSet
+    Condition: SesDnsRecords
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !GetAtt MailIdentity.DkimDNSTokenName2
+      Type: CNAME
+      TTL: "1800"
+      ResourceRecords: [!GetAtt MailIdentity.DkimDNSTokenValue2]
+
+  DkimRecord3:
+    Type: AWS::Route53::RecordSet
+    Condition: SesDnsRecords
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !GetAtt MailIdentity.DkimDNSTokenName3
+      Type: CNAME
+      TTL: "1800"
+      ResourceRecords: [!GetAtt MailIdentity.DkimDNSTokenValue3]
+
+  DmarcRecord:
+    Type: AWS::Route53::RecordSet
+    Condition: SesDnsRecords
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !Sub _dmarc.${DomainName}
+      Type: TXT
+      TTL: "1800"
+      ResourceRecords: ['"v=DMARC1; p=none;"']
+
+  # --- Monitoring ------------------------------------------------------------
+
+  AlertTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub ${Prefix}-alerts
+      Tags:
+        - {Key: Project, Value: !Ref ProjectTag}
+
+  AlertSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      TopicArn: !Ref AlertTopic
+      Protocol: email
+      Endpoint: !Ref AlertEmail
+
+  HostFaultAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub ${Prefix}-host-fault
+      AlarmDescription: AWS hardware fault under the instance. Recovers it onto healthy hardware.
+      Namespace: AWS/EC2
+      MetricName: StatusCheckFailed_System
+      Dimensions: [{Name: InstanceId, Value: !Ref Server}]
+      Statistic: Maximum
+      Period: 60
+      EvaluationPeriods: 2
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      AlarmActions:
+        - !Sub arn:${AWS::Partition}:automate:${AWS::Region}:ec2:recover
+        - !Ref AlertTopic
+      OKActions: [!Ref AlertTopic]
+
+  OsHungAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub ${Prefix}-os-hung
+      AlarmDescription: The instance's own status check is failing. Reboots it.
+      Namespace: AWS/EC2
+      MetricName: StatusCheckFailed_Instance
+      Dimensions: [{Name: InstanceId, Value: !Ref Server}]
+      Statistic: Maximum
+      Period: 60
+      EvaluationPeriods: 3
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      AlarmActions:
+        - !Sub arn:${AWS::Partition}:automate:${AWS::Region}:ec2:reboot
+        - !Ref AlertTopic
+      OKActions: [!Ref AlertTopic]
+
+  DiskAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub ${Prefix}-disk
+      AlarmDescription: Root volume filling. Usually fixed with docker builder prune -af.
+      Namespace: CWAgent
+      MetricName: disk_used_percent
+      Dimensions:
+        - {Name: InstanceId, Value: !Ref Server}
+        - {Name: path, Value: /}
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: !Ref DiskAlarmPercent
+      ComparisonOperator: GreaterThanThreshold
+      AlarmActions: [!Ref AlertTopic]
+      OKActions: [!Ref AlertTopic]
+
+  SiteHealthCheck:
+    Type: AWS::Route53::HealthCheck
+    Properties:
+      HealthCheckConfig:
+        Type: HTTPS
+        FullyQualifiedDomainName: !Ref DomainName
+        Port: 443
+        ResourcePath: /health/
+        EnableSNI: true
+        RequestInterval: 30
+        FailureThreshold: 3
+      HealthCheckTags:
+        - {Key: Name, Value: !Sub "${Prefix}-site"}
+        - {Key: Project, Value: !Ref ProjectTag}
+
+  SiteDownAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: InUsEast1
+    Properties:
+      AlarmName: !Sub ${Prefix}-site-down
+      AlarmDescription: !Sub https://${DomainName}/health/ failing from Route 53. Expected until phase 5 finishes.
+      Namespace: AWS/Route53
+      MetricName: HealthCheckStatus
+      Dimensions: [{Name: HealthCheckId, Value: !Ref SiteHealthCheck}]
+      Statistic: Minimum
+      Period: 60
+      EvaluationPeriods: 3
+      Threshold: 1
+      ComparisonOperator: LessThanThreshold
+      TreatMissingData: breaching
+      AlarmActions: [!Ref AlertTopic]
+      OKActions: [!Ref AlertTopic]
+
+  # --- Snapshots ---------------------------------------------------------
+
+  SnapshotRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${Prefix}-snapshots
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: {Service: dlm.amazonaws.com}
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub arn:${AWS::Partition}:iam::aws:policy/service-role/AWSDataLifecycleManagerServiceRole
+      Tags:
+        - {Key: Project, Value: !Ref ProjectTag}
+
+  # Crash-consistent machine rollback. The nightly dump (02:00 on the server,
+  # UTC) is the data backup; snapshots run after it.
+  SnapshotPolicy:
+    Type: AWS::DLM::LifecyclePolicy
+    Properties:
+      Description: !Sub ${Prefix} daily root-volume snapshots
+      State: ENABLED
+      ExecutionRoleArn: !GetAtt SnapshotRole.Arn
+      PolicyDetails:
+        PolicyType: EBS_SNAPSHOT_MANAGEMENT
+        ResourceTypes: [VOLUME]
+        TargetTags:
+          - {Key: !Sub "${Prefix}-snapshot", Value: daily}
+        Schedules:
+          - Name: daily
+            CopyTags: true
+            CreateRule:
+              Interval: 24
+              IntervalUnit: HOURS
+              Times: ["05:00"]
+            RetainRule:
+              Count: !Ref SnapshotRetainCount
+      Tags:
+        - {Key: Project, Value: !Ref ProjectTag}
+
+Outputs:
+  InstanceId:
+    Value: !Ref Server
+  PublicIp:
+    Description: Point DomainName's A record here when HostedZoneId is empty.
+    Value: !Ref PublicIp
+  SessionCommand:
+    Description: Shell on the server. There is no SSH.
+    Value: !Sub aws ssm start-session --target ${Server} --region ${AWS::Region}
+  BootstrapCheck:
+    Description: Prints the finish time once first-boot setup is done; the log is /var/log/aitutor-bootstrap.log.
+    Value: sudo cat /var/lib/aitutor-bootstrap.done
+  BackupBucketName:
+    Value: !Ref BackupBucket
+  AlertTopicArn:
+    Description: For the nightly backup's failure alert.
+    Value: !Ref AlertTopic
+  InstanceRoleArn:
+    Value: !GetAtt InstanceRole.Arn
+  HealthCheckId:
+    Value: !Ref SiteHealthCheck
