@@ -305,6 +305,8 @@ def create_compute(
         ("GOOGLE_API_KEY", "google-api-key"),
         ("ELEVENLABS_API_KEY", "elevenlabs-api-key"),
     ]
+    if "acs-connection-string" in secret_arns:
+        secret_env.append(("AZURE_COMMUNICATION_CONNECTION_STRING", "acs-connection-string"))
     ordered_secret_arns = [secret_arns[key] for _, key in secret_env]
 
     def _container(name, command, cpu, memory, stop_timeout=None):
@@ -378,10 +380,12 @@ def create_compute(
         # gunicorn ONLY — the Dockerfile CMD's migrate chain would race across
         # tasks. CI runs the migrate task definition below instead.
         ["gunicorn", "ai_tutor.config.wsgi:application", "--bind", f"0.0.0.0:{APP_PORT}",
-         # Two processes, eight threads: same 16 concurrent slots as the old
-         # 4x4, at half the resident model copies. Each worker holds its own
-         # encoder; threads share one.
-         "--workers", "2", "--threads", "8", "--timeout", "120"],
+         # Two processes, sixteen threads: 32 concurrent slots. A tutoring
+         # request spends nearly all its time waiting on the LLM, so slots run
+         # out long before CPU: a 2026-10-07 load test of 60 students on 2x8
+         # kept ~7 slots busy at 32% peak CPU. Each worker holds its own
+         # encoder; threads share one, so threads are the cheap way to add slots.
+         "--workers", "2", "--threads", "16", "--timeout", "120"],
         WEB_CPU, WEB_MEMORY,
     )
     migrate_td = _task_def(

@@ -158,6 +158,15 @@ def create_data(
             value = pulumi.Output.secret(f"PLACEHOLDER-set-via-pulumi-config-{key}")
         app_secrets[key] = _secret(prefix, key, value, tags, description=description)
 
+    # Optional secrets: created only when configured, never as a placeholder,
+    # because the app treats their mere presence as "use this backend".
+    for key, description in (
+        ("acs-connection-string", "Azure Communication Services email (transitional)"),
+    ):
+        value = config.get_secret(key)
+        if value is not None:
+            app_secrets[key] = _secret(prefix, key, value, tags, description=description)
+
     return Data(
         instance=instance,
         database_url_secret=database_url_secret,

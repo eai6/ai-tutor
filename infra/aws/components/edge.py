@@ -34,6 +34,7 @@ class Edge:
     web_acl: aws.wafv2.WebAcl
     certificate: "aws.acm.Certificate | None" = None
     validation_records: "object | None" = None
+    static_ips: "pulumi.Output | None" = None
 
 
 def create_edge(
@@ -47,6 +48,7 @@ def create_edge(
     hosted_zone_id: "str | None" = None,
     admin_allowed_cidrs: "list[str] | None" = None,
     admin_path: str = "/admin/",
+    static_ip: bool = False,
 ) -> Edge:
     alb = aws.lb.LoadBalancer(
         f"{prefix}-alb",
@@ -474,10 +476,62 @@ def create_edge(
             ],
         )
 
+    # ── Static IPs ─────────────────────────────────────────────────────────
+    # Seychelles schools allow-list the platform by IP, and an ALB's addresses
+    # change without notice. Global Accelerator puts two fixed anycast IPs in
+    # front of it; the ALB, its WAF and its listeners are unchanged.
+    #
+    # client_ip_preservation keeps the student's own address on the
+    # connection, so the ALB still appends the real client to X-Forwarded-For
+    # and the WAF rate rule and axes lockout key on students, not on GA.
+    #
+    # The Global Accelerator API lives only in us-west-2, whatever region the
+    # endpoint is in — hence the separate provider.
+    static_ips = None
+    if static_ip:
+        ga_provider = aws.Provider(f"{prefix}-ga-provider", region="us-west-2")
+        ga_opts = pulumi.ResourceOptions(provider=ga_provider)
+        accelerator = aws.globalaccelerator.Accelerator(
+            f"{prefix}-accelerator",
+            name=f"{prefix}-accelerator",
+            ip_address_type="IPV4",
+            enabled=True,
+            tags=tags,
+            opts=ga_opts,
+        )
+        ga_listener = aws.globalaccelerator.Listener(
+            f"{prefix}-ga-listener",
+            accelerator_arn=accelerator.arn,
+            protocol="TCP",
+            client_affinity="NONE",
+            port_ranges=[
+                aws.globalaccelerator.ListenerPortRangeArgs(from_port=80, to_port=80),
+                aws.globalaccelerator.ListenerPortRangeArgs(from_port=443, to_port=443),
+            ],
+            opts=ga_opts,
+        )
+        aws.globalaccelerator.EndpointGroup(
+            f"{prefix}-ga-endpoints",
+            listener_arn=ga_listener.arn,
+            endpoint_group_region=alb.arn.apply(lambda a: a.split(":")[3]),
+            endpoint_configurations=[
+                aws.globalaccelerator.EndpointGroupEndpointConfigurationArgs(
+                    endpoint_id=alb.arn,
+                    weight=100,
+                    client_ip_preservation_enabled=True,
+                )
+            ],
+            opts=ga_opts,
+        )
+        static_ips = accelerator.ip_sets.apply(
+            lambda sets: [ip for s in sets for ip in (s.ip_addresses or [])]
+        )
+
     return Edge(
         alb=alb,
         target_group=target_group,
         web_acl=web_acl,
         certificate=certificate,
         validation_records=validation_records,
+        static_ips=static_ips,
     )

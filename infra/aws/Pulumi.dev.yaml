@@ -2,19 +2,23 @@ config:
   aws:region: us-east-1
   aitutor-aws:enable-ecs: "true"
   aitutor-aws:waf-block-mode: "true"
-  aitutor-aws:image-tag: 5de65e505d28e2ae60be75e223f615ecda952b1e
-  aitutor-aws:domain-name: aitutor.edwardamoah.com
-  aitutor-aws:hosted-zone-id: Z00581302MRKJMLLLUCQ7
+  aitutor-aws:image-tag: d7a996db52bd49edc264b4856dd15957c98fbce9
+  aitutor-aws:domain-name: www.seselai.sc
   aitutor-aws:django-secret-key:
     secure: v1:H481I4YvAU5tcvSZ:3aI3ziMDC81k/RJBgSw1gDfHB4MN1oZSc61pxxq7kj1j2DR9YnbhS8XncflIJOGQsgZ1thHHRB9Vx3ISqlvd2D5wPiwEY1cd7JAbsulfRe6NHs8=
   aitutor-aws:anthropic-api-key:
-    secure: v1:oRQ9wdwJpacn+h7W:itC1yazKmJIB2TnAmh7JPQRCMZiarzcAJ4QLIsvGm7JEf3aJFRo4Aj3fybhgqfl6HypEQx9N3j3v16P3jaN+aARpaVOBgYGJGdZKN98wfIv+kvbWUjZNyUBNTptTBvt5kRMwaP7J8S5EAUTZTnC80DmjTX/16sllq/1iXw==
+    secure: v1:0JQHF4N3l5welS4d:UIpejudnX0zQCZkq2ycbg4+I/DxUnTR7gPiVy6XloYMDMxB5JN34xHlzWcKtBCRgxh2C5laVdbj5cdXVpqY1FF1NQka6vwJT47bEl/fGGu9V0t58XVLVFcUfsvzJM8HF0LIq+m1XI5JySOTaluMG9lXMdyjTMDF675s7Gw==
   aitutor-aws:openai-api-key:
-    secure: v1:wAbCRSnW5/GdC7C6:I/FaAg2tm+u11NYhrnYPaxeY9Oq+vRLtVvSUdlWJ9PnxBgY7V+3f5s6D1wYZVFLyY5QlkglhUQkvdNDXtxYDDw==
+    secure: v1:VZtFVLM/0fMPcNN6:8vUELiSLuGoWWm0kd35VFZx14+a9IXA8nlelzym/DGc1dGlCUeaWoIKBvBVog6/Z5kg55+B8aGfTVgElmorORcbK9Jzyg7VCFp1bciiiPm6y2zqaPUcngpGA1r41hnk3s2tHntHAfBJMz2ypdo+d3UGNc5BvUzbQUCxSBC0YjBtB+fno7/r7uDXdt4+CTptfqb1Uutn41Q2Br2+WK8oqzkmylBFTpHVXLcWDu9+Ifm/T79G8JRXt
   aitutor-aws:google-api-key:
-    secure: v1:vbAeMUXH1YJ28G9J:X3SdgNRFRjR0/V9YkNmS6BLY4gHPqte/iOyfbyEafNM6E5HNk1vNc8bPKhCU/Qa6fwLyC0YtRw==
+    secure: v1:tC7vqykkOnl9PEo5:WT1K8T9j0bfjW76sHmpQ6hjgmHFas5oeAxCLicgR4yy4j5aPD0rDpLYLoxo2gor7XQbt5mVAIw==
   aitutor-aws:elevenlabs-api-key:
     secure: v1:X94GIZJxqkhr1Mns:q6PRcr9MQ/DGgMCamzj3HVsmEN/Dnv4DPd5SWyhhToPuYEF5BpHqXqbOTWxbkvjcAwtnPx2PMOe4zPLQqbpiJSd6rA==
   aitutor-aws:db-password:
     secure: v1:jw5NnNueTtKJhi2s:rpMYRwhGM2HOW+1sKUXIcKvqDzUz2PC2h8FAaZ6iSyTuGFJXeujLyLlL4tBqI0x5
+  aitutor-aws:static-ip: "true"
+  aitutor-aws:acs-sender-address: noreply@mail.ai-tutor.wbg.edwardamoah.com
+  aitutor-aws:default-from-email: AI Tutor <noreply@mail.ai-tutor.wbg.edwardamoah.com>
+  aitutor-aws:acs-connection-string:
+    secure: v1:HVgmBdpYi4OHFWRw:kro7PVMitRlkwGGTEi+UNJ1ZoGbGTQa33gGR9FI4FHaQhMXmW/GAZIMJu0+0SIaNlkaLdQDD+GjaepoR2hmwaYCY5vOh3WlZJF6m8IHIcNrvJm6CLJzz7AVbEXMEmOwivDFHqK36r9VojonR/kM6aeMzVj9P4rC/F/wBL/HBBFnPNdW28oWCB0yql2jZ8FCS/mPyf+KD1YvMQMDGI0OWKarYaIudIoVIgNcNRNRuUyw90FdExzIRMg==
 encryptionsalt: v1:5q0lctFI6fU=:v1:5MI8U+sl5gvXI6L3:+ewCaTMafLqUfdJ8Y9SokmWuRoDYIA==

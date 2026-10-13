@@ -51,6 +51,12 @@ domain_name = config.get("domain-name")
 # Set it and the validation + alias records are managed here; leave it unset
 # and the CNAMEs must be added by hand wherever the zone lives.
 hosted_zone_id = config.get("hosted-zone-id")
+# Two fixed IPs (Global Accelerator) for schools that allow-list by address.
+static_ip = config.get_bool("static-ip") or False
+# Transitional email: send through the Azure Communication Services sender
+# until SES leaves the sandbox. Both unset -> SES/console as before.
+acs_sender = config.get("acs-sender-address")
+default_from_email = config.get("default-from-email")
 
 # Who may reach the Django admin console. Empty (the default) means everyone,
 # which is what the 2026-08-13 assessment found and raised as F-04. Set it to
@@ -89,6 +95,7 @@ edge = create_edge(
     hosted_zone_id=hosted_zone_id,
     admin_allowed_cidrs=admin_allowed_cidrs,
     admin_path=admin_path,
+    static_ip=static_ip,
 )
 
 # ECS cluster is unblocked (only task definitions need PassRole), so it is
@@ -201,6 +208,8 @@ task_environment = (
             # asserts the two backends agree. What it drops is ~500 MB of torch
             # per gunicorn worker.
             "EMBEDDING_BACKEND": "onnx",
+            **({"AZURE_COMMUNICATION_SENDER_ADDRESS": acs_sender} if acs_sender else {}),
+            **({"DEFAULT_FROM_EMAIL": default_from_email} if default_from_email else {}),
         }
     )
 )
@@ -275,3 +284,5 @@ if domain_name:
         ),
     )
     pulumi.export("site_url", f"https://{domain_name}")
+if static_ip:
+    pulumi.export("static_ips", edge.static_ips)
