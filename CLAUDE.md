@@ -1,13 +1,14 @@
 # AI Tutor — Claude instructions
 
-Django LLM-tutoring platform for secondary school students. Conversational sessions follow the 5E model; teachers manage curriculum via dashboard. Seychelles pilot in production; Tanzania pilot in planning. See `README.md` for the full architecture walkthrough.
+Django LLM-tutoring platform for secondary school students. Conversational sessions follow the 5E model; teachers manage curriculum via dashboard. Seychelles pilot in production on AWS (`https://www.seselai.sc`); Tanzania pilot in planning. See `README.md` for the full architecture walkthrough.
 
 ## Stack
 
 - **Backend**: Django 5, Python 3.11, PostgreSQL (prod) / SQLite (dev), Gunicorn
 - **LLM layer**: Anthropic / OpenAI / Google / Ollama, picked per purpose via `llm.ModelConfig`. Abstraction lives in `apps/llm/client.py::BaseLLMClient`. Mirror this pattern when adding providers.
 - **Vector DB**: ChromaDB + `sentence-transformers` (all-MiniLM-L6-v2, offline)
-- **Deploy**: Azure Container Apps (Pixel Design Labs subscription), Pulumi IaC in `infra/`, GitHub Actions on push to `main`. Mac must build `--platform linux/amd64` or use CI.
+- **Deploy (production = AWS since 2026-10-13)**: ECS Fargate + RDS Postgres + S3 in account 968025288404 (us-east-1), behind an ALB fronted by Global Accelerator — static IPs `15.197.210.19` and `166.117.235.186`, which schools allow-list. DNS for `seselai.sc` is at name.com. Pulumi IaC in `infra/aws/` (project `aitutor-aws`, stack `dev` — the name predates the move; it IS production). `.github/workflows/deploy-aws.yml` deploys on push to `aws_deployment`. Mac must build `--platform linux/amd64` or use CI.
+- **Former production (Azure, being decommissioned)**: Container Apps in the Pixel Design Labs subscription, Pulumi stack `pixel` in `infra/`, deployed on push to `main`. Stopped 2026-10-13 (revision deactivated), kept only as a rollback until it is torn down. A push to `main` no longer reaches users.
 - **Apps** under `apps/`: `accounts` (auth, Institution, StudentProfile), `curriculum` (Course → Unit → Lesson → LessonStep, KnowledgeBase, ContentGenerator), `tutoring` (TutorSession + `conversational_tutor.py` engine), `dashboard` (teacher UI), `llm`, `media_library`, `safety`
 
 ## Commands
@@ -18,10 +19,10 @@ python manage.py migrate                    # apply migrations
 python manage.py makemigrations             # create migrations
 pytest                                      # run tests (pytest-django)
 pytest apps/tutoring/tests/ -k mastery      # scoped test run
-git push origin main                        # triggers Azure deploy via GitHub Actions
+git push origin aws_deployment              # deploys PRODUCTION (AWS) via GitHub Actions
 ```
 
-Azure commands require `az account set --subscription "Pixel Design Labs LLC"` first.
+AWS commands need `AWS_PROFILE=aitutor`; Pulumi in `infra/aws/` also needs `PULUMI_CONFIG_PASSPHRASE_FILE=../.pulumi-passphrase`. Pulumi task-definition changes reach the running service only after `aws ecs update-service --cluster aitutor-dev-cluster --service aitutor-dev-service --task-definition aitutor-dev-web --force-new-deployment`. Azure commands (legacy stack only) require `az account set --subscription "Pixel Design Labs LLC"` first.
 
 ## Critical rules — always apply
 
@@ -41,8 +42,9 @@ Azure commands require `az account set --subscription "Pixel Design Labs LLC"` f
 
 **Login lockout.** django-axes locks the `(ip_address, username)` pair after 5 failures for 1 hour and answers 429. Every `authenticate()` call MUST pass `request` — `AxesStandaloneBackend` raises without it. Never lock on username alone (DoS against a named student) or IP alone (locks out a whole school behind one NAT).
 
-**Azure Container Apps constraints.**
-- No SSE / chunked streaming in production → `respond_stream()` exists but unused; production uses buffered JSON.
+**Buffered responses.** Production uses buffered JSON, not SSE / chunked streaming → `respond_stream()` exists but unused.
+
+**Legacy Azure Container Apps constraints** (apply only to the stopped Azure stack):
 - ChromaDB SQLite hangs over the SMB mount → `VECTORDB_ROOT=/tmp/vectordb`; Dockerfile CMD copies vectordb from the mount at startup.
 - `CSRF_TRUSTED_ORIGINS` uses `env.default_domain` (not a hardcoded URL) so the env hash is correct.
 
@@ -115,9 +117,9 @@ Auto-memory at `~/.claude/projects/-Users-edwardamoah-Documents-GitHub-ai-tutor/
 ## Before risky actions
 
 - **Destructive git** (reset --hard, force push, branch delete): confirm with user.
-- **Pulumi destroy / Azure resource deletion**: confirm with user. Pulumi stack is `pixel`.
+- **Pulumi destroy / AWS or Azure resource deletion**: confirm with user. Production is the AWS stack `dev` in `infra/aws/`; the Azure stack `pixel` is legacy. Never touch the production RDS instance `aitutor-dev-db` or the S3 media/backup buckets without an explicit go-ahead.
 - **Migrations against prod**: dry-run against a copy of the prod DB dump first. Backfill migrations especially.
-- **Editing `config/settings.py`, `Dockerfile`, `.github/workflows/`, `infra/__main__.py`**: confirm approach before changing. These are load-bearing for production.
+- **Editing `config/settings.py`, `Dockerfile`, `.github/workflows/`, `infra/aws/`, `infra/__main__.py`**: confirm approach before changing. These are load-bearing for production.
 
 ## Bug-fix workflow — test locally before deploy
 
